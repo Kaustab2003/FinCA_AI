@@ -6,8 +6,8 @@ Supports PDF, TXT, and web scraping for financial documents
 import os
 from typing import List
 from langchain.schema import Document
-from langchain.document_loaders import PyPDFLoader, TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 class FinancialDocumentLoader:

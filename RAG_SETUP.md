@@ -124,8 +124,8 @@ Source-backed Answer
 
 ```env
 # Already in your .env
-OPENAI_API_KEY=sk-proj-...     # For embeddings
-GROQ_API_KEY=gsk_...           # For LLM
+GROQ_API_KEY=gsk_...           # For LLM (FREE via Groq)
+# Note: Using HuggingFace embeddings (FREE, no API key needed)
 ```
 
 ### Vector Database
@@ -138,9 +138,10 @@ GROQ_API_KEY=gsk_...           # For LLM
 ## 📊 Performance
 
 - **Query Response**: 2-5 seconds
-- **Embedding Model**: text-embedding-3-small (cost-effective)
+- **Embedding Model**: sentence-transformers/all-MiniLM-L6-v2 (FREE via HuggingFace)
 - **LLM**: Llama 3.3 70B via Groq (FREE & fast)
 - **Retrieval**: Top 5 most relevant documents
+- **100% FREE** - No API costs!
 
 ## 🎨 Customization
 

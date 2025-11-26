@@ -6,9 +6,9 @@ Provides answers from Indian tax laws, RBI circulars, SEBI regulations, and pers
 import os
 from typing import List, Dict, Optional
 from langchain_groq import ChatGroq
-from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
@@ -29,10 +29,11 @@ class FinancialKnowledgeAgent:
             groq_api_key=settings.GROQ_API_KEY
         )
         
-        # Embeddings for vector database
-        self.embeddings = OpenAIEmbeddings(
-            openai_api_key=settings.OPENAI_API_KEY,
-            model="text-embedding-3-small"  # Cost-effective embedding model
+        # Embeddings for vector database (using free HuggingFace model)
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",  # Fast, lightweight, free
+            model_kwargs={'device': 'cpu'},  # Use CPU (faster on Windows)
+            encode_kwargs={'normalize_embeddings': True}  # Better similarity search
         )
         
         # Vector store path

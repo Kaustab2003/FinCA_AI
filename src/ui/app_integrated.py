@@ -3013,9 +3013,11 @@ def show_knowledge_base():
     st.info("""
     **💡 How it works:**
     - Uses **LangChain RAG** (Retrieval Augmented Generation)
+    - **FREE embeddings** from HuggingFace (sentence-transformers)
     - Searches through **Indian tax laws, RBI circulars, SEBI regulations**
     - Provides **accurate, source-backed answers**
     - Powered by **Groq (Llama 3.3 70B)** for fast responses
+    - **100% FREE** - No OpenAI costs!
     """)
     
     with st.expander("ℹ️ What kind of questions can I ask?"):
