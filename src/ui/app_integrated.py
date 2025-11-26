@@ -1917,11 +1917,17 @@ def show_quick_money_moves():
                         'priority': priority,
                         'category': category
                     }
-                    db.table('quick_money_moves').insert(data).execute()
-                    st.success(f"✅ Money move '{action_item}' added!")
-                    st.rerun()
+                    result = db.table('quick_money_moves').insert(data).execute()
+                    if result.data:
+                        st.success(f"✅ Money move '{action_item}' added!")
+                        st.balloons()
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ Move added but no confirmation received")
+                        st.rerun()
                 except Exception as e:
                     st.error(f"❌ Failed to add move: {e}")
+                    st.exception(e)
     
     # Quick Wins Section
     if pending_moves:
@@ -1986,7 +1992,7 @@ def show_quick_money_moves():
                                 actual = st.number_input("Actual Impact (₹/mo)", 
                                     value=float(move['estimated_impact']), key=f"actual_{move['id']}")
                                 
-                                acol1, acol2 = st.columns(2)
+                                acol1, acol2, acol3 = st.columns(3)
                                 if acol1.button("✅ Complete", key=f"comp_{move['id']}"):
                                     try:
                                         db.table('quick_money_moves').update({
@@ -2006,15 +2012,38 @@ def show_quick_money_moves():
                                         st.rerun()
                                     except Exception as e:
                                         st.error(str(e))
+                                
+                                if acol3.button("🗑️ Delete", key=f"del_{move['id']}"):
+                                    try:
+                                        db.table('quick_money_moves').delete().eq('id', move['id']).execute()
+                                        st.success("Deleted!")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(str(e))
         else:
             st.info("No pending moves. Add new ones above!")
     
     with tab2:
         if completed_moves:
-            completed_df = pd.DataFrame(completed_moves)
-            completed_df['completed_date'] = pd.to_datetime(completed_df['completed_date']).dt.strftime('%Y-%m-%d')
-            display_cols = ['action_item', 'move_type', 'estimated_impact', 'actual_impact', 'completed_date']
-            st.dataframe(completed_df[display_cols], use_container_width=True, hide_index=True)
+            # Show each completed move with delete option
+            for move in completed_moves:
+                with st.container():
+                    ccol1, ccol2, ccol3, ccol4, ccol5 = st.columns([3, 2, 2, 2, 1])
+                    
+                    ccol1.write(f"**{move['action_item']}**")
+                    ccol2.write(f"{move['move_type']}")
+                    ccol3.write(f"Est: ₹{move.get('estimated_impact', 0):,.0f}")
+                    ccol4.write(f"Actual: ₹{move.get('actual_impact', 0):,.0f}")
+                    
+                    if ccol5.button("🗑️", key=f"del_comp_{move['id']}", help="Delete this move"):
+                        try:
+                            db.table('quick_money_moves').delete().eq('id', move['id']).execute()
+                            st.success("Deleted!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                    
+                    st.markdown("---")
             
             # Success metrics
             st.success(f"""
