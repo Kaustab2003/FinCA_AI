@@ -1,0 +1,225 @@
+# ============================================
+# FinCA AI - Git Ignore Configuration
+# ============================================
+
+# Environment Variables (CRITICAL - Never commit!)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.log
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+db.sqlite3
+*.sql
+
+# Logs
+logs/
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cache
+.cache/
+*.cache
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+
+# Secrets & Keys (CRITICAL)
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account.json
+*.credentials
+
+# API Keys (CRITICAL - Never commit!)
+*api_key*
+*API_KEY*
+*secret*
+*SECRET*
+*SETUP*FREE*AI*.md
+SETUP_FREE_AI.md
+*FREE_AI*.md
+*API*KEYS*.md
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/credentials.toml
+
+# Backup files
+*.bak
+*.backup
+*.old
+*_backup.*
+backup/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Documentation (optional - uncomment if you want to exclude)
+# docs/_build/
+
+# Data files (large datasets)
+data/raw/
+data/processed/
+
+# Model files (large ML models)
+models/*.pkl
+models/*.h5
+models/*.pt
+models/*.pth
+*.ckpt
+*.safetensors
+
+# Node modules (if using any JS tools)
+node_modules/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Redis dump
+dump.rdb
+
+# Supabase local
+.supabase/
+
+# Sentry
+.sentryclirc
+
+# Mac
+.AppleDouble
+.LSOverride
+
+# Windows
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# User uploaded files
+uploads/
+media/
+static/media/
+
+# Compiled translations
+*.mo
+
+# Package files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Archives
+*.tar.gz
+*.tgz
+
+# Private notes
+NOTES.md
+TODO.md
+PRIVATE.md
+
+# Local configuration
+local_settings.py
+.local/
+
+# Docker
+*.dockerignore
+docker-compose.override.yml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# AWS
+.aws/
+
+# Azure
+.azure/
+
+# Google Cloud
+.gcloud/

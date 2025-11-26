@@ -1,0 +1,62 @@
+# ============================================
+# FinCA AI - Python Dependencies
+# ============================================
+
+# Core Framework
+streamlit
+python-dotenv
+pydantic
+pydantic-settings
+
+# Database & Storage
+supabase
+psycopg2-binary
+
+# AI & ML
+openai
+langchain
+langchain-openai
+langchain-community
+tiktoken
+
+# Monitoring & Logging
+langsmith
+sentry-sdk
+structlog
+
+# Security
+cryptography
+python-jose[cryptography]
+
+# Data Processing
+pandas
+numpy
+python-dateutil
+
+# Web & APIs
+requests
+httpx
+aiohttp
+
+# Utilities
+tenacity
+
+# Optional: Voice Assistant (uncomment if needed)
+# openai-whisper
+# ffmpeg-python
+# pyttsx3
+
+# Optional: Advanced Features (uncomment if needed)
+# redis
+# celery[redis]
+# beautifulsoup4
+
+# Development & Testing
+pytest
+pytest-asyncio
+black
+flake8
+
+# Plotting & Visualization
+plotly
+matplotlib
