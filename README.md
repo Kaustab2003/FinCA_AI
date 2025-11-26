@@ -74,6 +74,10 @@ print(Fernet.generate_key().decode())
 
 ---
 
+## Link - https://fincaai-ndahnkesaixcqewhqeaid3.streamlit.app/
+
+---
+
 ## 📁 Project Structure
 
 ```
