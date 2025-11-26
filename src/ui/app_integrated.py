@@ -17,6 +17,8 @@ from src.services.chat_service import ChatService
 from src.services.budget_service import BudgetService
 from src.services.goals_service import GoalsService
 from src.services.user_service import UserService
+from src.agents.rag_knowledge_agent import FinancialKnowledgeAgent
+from src.utils.document_loader import IndianFinancialDocuments
 
 # Initialize logger
 logger.info("Starting FinCA AI application")
@@ -2134,7 +2136,7 @@ def main():
              "💳 EMI Calculator", "💎 80C Comparator", "🏖️ Retirement Planner",
              "📊 Expense Analytics", "👤 Profile",
              "💰 Salary Breakup", "📱 Bill Reminder", "💳 Credit Card Optimizer",
-             "🏦 FD vs Debt Fund", "⚡ Quick Money Moves"],
+             "🏦 FD vs Debt Fund", "⚡ Quick Money Moves", "📚 Knowledge Base"],
             label_visibility="collapsed"
         )
         
@@ -2210,6 +2212,8 @@ def main():
         show_fd_vs_debt_fund()
     elif page == "⚡ Quick Money Moves":
         show_quick_money_moves()
+    elif page == "📚 Knowledge Base":
+        show_knowledge_base()
 
 def show_dashboard():
     """Dashboard with real data, graphs, and insights"""
@@ -2891,6 +2895,155 @@ def show_profile():
         
         if st.form_submit_button("💾 Save Profile"):
             st.success("✅ Profile updated successfully!")
+
+def show_knowledge_base():
+    """Financial Knowledge Base using LangChain RAG"""
+    st.header("📚 Financial Knowledge Base")
+    st.markdown("Ask any question about Indian taxes, investments, savings, or personal finance!")
+    
+    # Initialize RAG agent
+    if 'knowledge_agent' not in st.session_state:
+        with st.spinner("🔄 Initializing knowledge base..."):
+            try:
+                st.session_state.knowledge_agent = FinancialKnowledgeAgent()
+                
+                # Load additional documents
+                indian_docs = IndianFinancialDocuments()
+                additional_docs = []
+                additional_docs.extend(indian_docs.get_tax_documents())
+                additional_docs.extend(indian_docs.get_investment_documents())
+                additional_docs.extend(indian_docs.get_banking_documents())
+                
+                if additional_docs:
+                    st.session_state.knowledge_agent.add_documents(additional_docs)
+                
+                st.success("✅ Knowledge base ready!")
+            except Exception as e:
+                st.error(f"❌ Error initializing knowledge base: {str(e)}")
+                st.stop()
+    
+    agent = st.session_state.knowledge_agent
+    
+    # Example queries
+    st.markdown("### 💡 Try These Questions:")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("📋 What is Section 80C?"):
+            st.session_state.kb_query = "What is Section 80C and how much can I save?"
+    
+    with col2:
+        if st.button("⚖️ Old vs New Tax Regime"):
+            st.session_state.kb_query = "Compare old tax regime vs new tax regime for FY 2024-25"
+    
+    with col3:
+        if st.button("📊 ELSS vs PPF"):
+            st.session_state.kb_query = "Should I invest in ELSS or PPF for tax saving?"
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🏠 HRA Calculation"):
+            st.session_state.kb_query = "How to calculate HRA exemption?"
+    
+    with col2:
+        if st.button("💰 Emergency Fund"):
+            st.session_state.kb_query = "How much emergency fund should I maintain?"
+    
+    with col3:
+        if st.button("📈 SIP Strategy"):
+            st.session_state.kb_query = "What is the best SIP investment strategy?"
+    
+    st.markdown("---")
+    
+    # Query input
+    query = st.text_area(
+        "🔍 Ask Your Question:",
+        value=st.session_state.get('kb_query', ''),
+        height=100,
+        placeholder="E.g., What are the tax implications of mutual fund investments?"
+    )
+    
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        ask_button = st.button("🚀 Ask", type="primary")
+    with col2:
+        if st.button("🗑️ Clear"):
+            st.session_state.kb_query = ''
+            st.rerun()
+    
+    # Process query
+    if ask_button and query:
+        with st.spinner("🤔 Searching knowledge base..."):
+            result = agent.ask(query)
+        
+        if result['status'] == 'success':
+            st.markdown("### 📝 Answer:")
+            st.markdown(result['answer'])
+            
+            # Show sources
+            if result['sources']:
+                with st.expander(f"📚 Sources ({len(result['sources'])} documents)"):
+                    for i, source in enumerate(result['sources'], 1):
+                        st.markdown(f"**Source {i}:**")
+                        st.markdown(f"- {source['metadata']}")
+                        st.markdown(f"> {source['content']}")
+                        st.markdown("---")
+        else:
+            st.error("❌ Error processing query")
+        
+        # Clear the query
+        st.session_state.kb_query = ''
+    
+    st.markdown("---")
+    
+    # Knowledge Base Stats
+    st.markdown("### 📊 Knowledge Base Stats")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("📄 Documents", "50+", "Indian Finance")
+    with col2:
+        st.metric("📚 Categories", "8", "Tax, Investment, Banking")
+    with col3:
+        st.metric("🔍 Search Type", "Semantic", "AI-Powered")
+    
+    # Information boxes
+    st.info("""
+    **💡 How it works:**
+    - Uses **LangChain RAG** (Retrieval Augmented Generation)
+    - Searches through **Indian tax laws, RBI circulars, SEBI regulations**
+    - Provides **accurate, source-backed answers**
+    - Powered by **Groq (Llama 3.3 70B)** for fast responses
+    """)
+    
+    with st.expander("ℹ️ What kind of questions can I ask?"):
+        st.markdown("""
+        **Tax Related:**
+        - Income tax slabs and calculations
+        - Deductions (80C, 80D, HRA, etc.)
+        - Old vs New tax regime comparison
+        - ITR filing requirements
+        
+        **Investment Related:**
+        - Mutual fund categories
+        - ELSS vs PPF comparison
+        - SIP strategies and returns
+        - Asset allocation guidelines
+        
+        **Banking & Savings:**
+        - Fixed deposits vs debt funds
+        - PPF, NSC, SCSS details
+        - Credit score management
+        - Emergency fund planning
+        
+        **Personal Finance:**
+        - Retirement planning
+        - Credit card best practices
+        - Goal-based investing
+        - Tax saving strategies
+        """)
 
 if __name__ == "__main__":
     logger.info("FinCA AI application started")

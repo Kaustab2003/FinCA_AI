@@ -14,10 +14,21 @@ psycopg2-binary
 
 # AI & ML
 openai
-langchain
-langchain-openai
-langchain-community
+langchain==0.3.13
+langchain-core==0.3.28
+langchain-openai==0.2.14
+langchain-community==0.3.13
+langchain-groq==0.2.1
+langchain-text-splitters==0.3.4
 tiktoken
+
+# RAG (Retrieval Augmented Generation)
+chromadb==0.4.22
+sentence-transformers==2.3.1
+
+# Document Processing for RAG
+pypdf==4.0.1
+unstructured==0.11.8
 
 # Monitoring & Logging
 langsmith
