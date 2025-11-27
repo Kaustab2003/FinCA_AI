@@ -21,6 +21,8 @@ langchain-openai
 langchain-community
 langchain-groq
 langchain-text-splitters
+langchain-huggingface
+langchain-chroma
 tiktoken
 
 # RAG (Retrieval Augmented Generation)

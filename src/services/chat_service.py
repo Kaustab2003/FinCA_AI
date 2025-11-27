@@ -5,6 +5,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 from src.config.database import DatabaseClient
 from src.agents.supervisor import SupervisorAgent
+from src.services.vector_service import VectorService
 from src.utils.logger import logger
 
 
@@ -14,6 +15,7 @@ class ChatService:
     def __init__(self):
         self.db = DatabaseClient.get_client()
         self.supervisor = SupervisorAgent()
+        self.vector_service = VectorService()
     
     async def process_message(self, user_id: str, message: str, user_context: Dict[str, Any]) -> Dict[str, Any]:
         """Process a chat message and get AI response"""
@@ -21,26 +23,36 @@ class ChatService:
             # Save user message to chat history
             await self.save_message(user_id, 'user', message)
             
-            # Get AI response from supervisor
-            response = await self.supervisor.process(message, user_context)
+            # Get user-specific relevant context from vector store
+            user_vectors = await self.vector_service.retrieve_user_context(user_id, message, top_k=5)
+            
+            # Enhance user context with personal data
+            enhanced_context = user_context.copy()
+            enhanced_context['user_data'] = user_vectors
+            enhanced_context['personal_finances'] = self._format_user_vectors(user_vectors)
+            
+            # Get AI response from supervisor with enhanced context
+            response = await self.supervisor.process(message, enhanced_context)
             
             # Save assistant response to chat history
             await self.save_message(user_id, 'assistant', response.content, {
                 'agent_type': response.agent_type,
                 'confidence': response.confidence,
-                'tool_calls': response.tools_used
+                'tool_calls': response.tools_used,
+                'user_context_used': len(user_vectors)
             })
             
-            logger.info("Chat message processed", 
+            logger.info("Chat message processed with user context", 
                        user_id=user_id,
                        agent_type=response.agent_type,
-                       confidence=response.confidence)
+                       user_vectors_used=len(user_vectors))
             
             return {
                 'response': response.content,
                 'agent_name': response.agent_name,
                 'agent_type': response.agent_type,
                 'confidence': response.confidence,
+                'user_context_used': len(user_vectors),
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -87,6 +99,21 @@ class ChatService:
         except Exception as e:
             logger.error("Chat history fetch failed", error=str(e), user_id=user_id)
             return []
+    
+    def _format_user_vectors(self, vectors: List[Dict]) -> str:
+        """Format user vectors for LLM context"""
+        context_parts = []
+        for vector in vectors:
+            if vector['data_type'] == 'budget':
+                context_parts.append(f"Your budget: {vector['content']}")
+            elif vector['data_type'] == 'goal':
+                context_parts.append(f"Your goal: {vector['content']}")
+            elif vector['data_type'] == 'transaction':
+                context_parts.append(f"Your transaction: {vector['content']}")
+            else:
+                context_parts.append(f"Your data: {vector['content']}")
+        
+        return "\n".join(context_parts) if context_parts else "No personal financial data available."
     
     async def clear_chat_history(self, user_id: str) -> bool:
         """Clear chat history for a user"""

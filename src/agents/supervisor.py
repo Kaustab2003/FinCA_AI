@@ -97,7 +97,7 @@ Respond with ONLY the agent name (tax/investment/debt/legal)."""
             return self._detect_intent(query)
     
     async def process(self, query: str, user_context: Dict[str, Any]) -> AgentResponse:
-        """Route query to appropriate agent"""
+        """Route query to appropriate agent with personal context"""
         try:
             # Detect intent
             agent_type = self._detect_intent(query)
@@ -119,12 +119,24 @@ Respond with ONLY the agent name (tax/investment/debt/legal)."""
             
             specialized_agent = agent_map.get(agent_type)
             
-            logger.info("Routing query", 
+            # Enhance user context with personal financial data
+            enhanced_context = user_context.copy()
+            personal_data = user_context.get('personal_finances', '')
+            if personal_data:
+                enhanced_context['system_prompt_addition'] = f"""
+                User's personal financial data:
+                {personal_data}
+                
+                Use this information to provide personalized advice.
+                """
+            
+            logger.info("Routing query with personal context", 
                        agent_type=agent_type,
+                       has_personal_data=bool(personal_data),
                        query_preview=query[:50])
             
-            # Process with specialized agent
-            response = await specialized_agent.process(query, user_context)
+            # Process with specialized agent using enhanced context
+            response = await specialized_agent.process(query, enhanced_context)
             
             return AgentResponse(
                 content=response.content,
@@ -135,6 +147,7 @@ Respond with ONLY the agent name (tax/investment/debt/legal)."""
                 metadata={
                     'routed_to': agent_type,
                     'routing_confidence': confidence,
+                    'personalized': bool(personal_data),
                     **response.metadata
                 }
             )

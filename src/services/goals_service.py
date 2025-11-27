@@ -4,6 +4,7 @@ Goals Service - Handle financial goals operations
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from src.config.database import DatabaseClient
+from src.services.vector_service import VectorService
 from src.utils.logger import logger
 
 
@@ -12,6 +13,7 @@ class GoalsService:
     
     def __init__(self):
         self.db = DatabaseClient.get_client()
+        self.vector_service = VectorService()
     
     async def create_goal(self, user_id: str, goal_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new financial goal"""
@@ -30,7 +32,33 @@ class GoalsService:
             
             result = self.db.table('goals').insert(data).execute()
             
-            logger.info("Goal created", user_id=user_id, goal_name=data['goal_name'])
+            # Embed goal data for personalized AI
+            goal_content = f"""
+            Financial Goal: {data['goal_name']}
+            Target Amount: ₹{data['target_amount']}
+            Current Amount: ₹{data['current_amount']}
+            Target Date: {data['target_date']}
+            Category: {data['category']}
+            Priority: {data['priority']}
+            Progress: {data['current_amount']/data['target_amount']*100:.1f}% completed
+            """
+            
+            await self.vector_service.embed_user_data(
+                user_id=user_id,
+                data_type='goal',
+                content=goal_content,
+                metadata={
+                    'goal_name': data['goal_name'],
+                    'target_amount': data['target_amount'],
+                    'current_amount': data['current_amount'],
+                    'progress': data['current_amount']/data['target_amount'] if data['target_amount'] > 0 else 0,
+                    'category': data['category'],
+                    'priority': data['priority'],
+                    'goal_id': result.data[0]['id'] if result.data else None
+                }
+            )
+            
+            logger.info("Goal created and embedded", user_id=user_id, goal_name=data['goal_name'])
             return result.data[0] if result.data else None
             
         except Exception as e:

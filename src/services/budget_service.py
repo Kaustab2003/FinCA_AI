@@ -4,6 +4,7 @@ Budget Service - Handle budget operations
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from src.config.database import DatabaseClient
+from src.services.vector_service import VectorService
 from src.utils.logger import logger
 
 
@@ -12,6 +13,7 @@ class BudgetService:
     
     def __init__(self):
         self.db = DatabaseClient.get_client()
+        self.vector_service = VectorService()
     
     async def create_budget(self, user_id: str, budget_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new budget entry"""
@@ -32,7 +34,30 @@ class BudgetService:
             
             result = self.db.table('budgets').insert(data).execute()
             
-            logger.info("Budget created", user_id=user_id, month=data['month'])
+            # Embed budget data for personalized AI
+            budget_content = f"""
+            Monthly Budget for {data['month']}: 
+            Income: ₹{data['income']}, 
+            Fixed Expenses: ₹{data['fixed_expenses']}, 
+            Variable Expenses: ₹{data['variable_expenses']}, 
+            Savings: ₹{data['savings']}, 
+            Investments: ₹{data['investments']}
+            """
+            
+            await self.vector_service.embed_user_data(
+                user_id=user_id,
+                data_type='budget',
+                content=budget_content,
+                metadata={
+                    'month': data['month'],
+                    'income': data['income'],
+                    'savings': data['savings'],
+                    'savings_rate': data['savings']/data['income'] if data['income'] > 0 else 0,
+                    'budget_id': result.data[0]['id'] if result.data else None
+                }
+            )
+            
+            logger.info("Budget created and embedded", user_id=user_id, month=data['month'])
             return result.data[0] if result.data else None
             
         except Exception as e:

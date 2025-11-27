@@ -961,6 +961,238 @@ def show_expense_analytics():
                 st.success("✅ All manual expenses cleared!")
                 st.rerun()
 
+def show_goals():
+    """Goals manager with database integration"""
+    st.header("🎯 Financial Goals Manager")
+    
+    # Get user ID
+    user_id = st.session_state.user_id
+    
+    # Load existing goals
+    goals_service = services['goals']
+    
+    # Run async function to get current goals
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    goals = loop.run_until_complete(
+        goals_service.get_all_goals(user_id)
+    )
+    loop.close()
+    
+    # Display existing goals
+    if goals:
+        st.subheader("📋 Your Financial Goals")
+        
+        # Goals summary
+        total_goals = len(goals)
+        completed_goals = len([g for g in goals if g['status'] == 'completed'])
+        active_goals = len([g for g in goals if g['status'] == 'active'])
+        total_target = sum(g['target_amount'] for g in goals)
+        total_current = sum(g['current_amount'] for g in goals)
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Goals", total_goals)
+        with col2:
+            st.metric("Active Goals", active_goals)
+        with col3:
+            st.metric("Completed", f"{completed_goals}/{total_goals}")
+        with col4:
+            st.metric("Overall Progress", f"₹{total_current:,.0f}/₹{total_target:,.0f}")
+        
+        # Display each goal
+        for goal in goals:
+            with st.container():
+                # Calculate progress
+                progress = (goal['current_amount'] / goal['target_amount'] * 100) if goal['target_amount'] > 0 else 0
+                remaining = goal['target_amount'] - goal['current_amount']
+                
+                # Goal card
+                col1, col2, col3 = st.columns([2, 1, 1])
+                
+                with col1:
+                    st.markdown(f"### {goal['goal_name']}")
+                    st.markdown(f"**Category:** {goal['category'].title()} | **Priority:** {goal['priority'].title()}")
+                    if goal['target_date']:
+                        st.markdown(f"**Target Date:** {goal['target_date'][:10]}")
+                    if goal['notes']:
+                        st.caption(goal['notes'])
+                
+                with col2:
+                    st.metric("Progress", f"{progress:.1f}%", 
+                             f"₹{remaining:,.0f} left" if remaining > 0 else "✅ Complete!")
+                    # Progress bar
+                    st.progress(min(progress/100, 1.0))
+                
+                with col3:
+                    st.metric("Current", f"₹{goal['current_amount']:,.0f}")
+                    st.metric("Target", f"₹{goal['target_amount']:,.0f}")
+                    
+                    # Status badge
+                    if goal['status'] == 'completed':
+                        st.success("✅ Completed")
+                    elif progress >= 75:
+                        st.info("🚀 Almost there!")
+                    elif progress >= 50:
+                        st.warning("📈 On track")
+                    else:
+                        st.error("⚠️ Needs attention")
+                
+                # Action buttons
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    if st.button(f"💰 Add Progress", key=f"add_{goal['id']}"):
+                        amount = st.number_input(f"Amount to add for {goal['goal_name']}", 
+                                               min_value=0, value=1000, step=500, key=f"amt_{goal['id']}")
+                        if st.button(f"✅ Confirm Add ₹{amount:,.0f}", key=f"confirm_{goal['id']}"):
+                            try:
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                result = loop.run_until_complete(
+                                    goals_service.add_progress(goal['id'], amount)
+                                )
+                                loop.close()
+                                st.success(f"✅ Added ₹{amount:,.0f} to {goal['goal_name']}!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Failed to add progress: {str(e)}")
+                
+                with col2:
+                    if st.button(f"✏️ Edit", key=f"edit_{goal['id']}"):
+                        st.session_state[f"edit_goal_{goal['id']}"] = True
+                
+                with col3:
+                    if st.button(f"📊 Details", key=f"details_{goal['id']}"):
+                        metrics = goals_service.calculate_goal_metrics(goal)
+                        with st.expander(f"📊 Detailed Metrics for {goal['goal_name']}", expanded=True):
+                            st.write(f"**Progress:** {metrics['progress_percentage']:.1f}%")
+                            st.write(f"**Amount Remaining:** ₹{metrics['amount_remaining']:,.0f}")
+                            st.write(f"**On Track:** {'✅ Yes' if metrics['is_on_track'] else '⚠️ No'}")
+                            if 'months_remaining' in metrics:
+                                st.write(f"**Months Remaining:** {metrics['months_remaining']}")
+                                st.write(f"**Monthly Required:** ₹{metrics['monthly_required']:,.0f}")
+                
+                with col4:
+                    if st.button(f"🗑️ Delete", key=f"delete_{goal['id']}"):
+                        if st.button(f"⚠️ Confirm Delete {goal['goal_name']}?", key=f"confirm_del_{goal['id']}"):
+                            try:
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                result = loop.run_until_complete(
+                                    goals_service.delete_goal(goal['id'])
+                                )
+                                loop.close()
+                                if result:
+                                    st.success(f"✅ Deleted {goal['goal_name']}!")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to delete goal")
+                            except Exception as e:
+                                st.error(f"❌ Failed to delete goal: {str(e)}")
+                
+                # Edit form (if editing)
+                if st.session_state.get(f"edit_goal_{goal['id']}", False):
+                    with st.expander(f"✏️ Edit {goal['goal_name']}", expanded=True):
+                        with st.form(f"edit_goal_form_{goal['id']}"):
+                            edit_name = st.text_input("Goal Name", value=goal['goal_name'])
+                            edit_target = st.number_input("Target Amount (₹)", 
+                                                        min_value=0, 
+                                                        value=int(goal['target_amount']), 
+                                                        step=1000)
+                            edit_current = st.number_input("Current Amount (₹)", 
+                                                         min_value=0, 
+                                                         value=int(goal['current_amount']), 
+                                                         step=1000)
+                            edit_category = st.selectbox("Category", 
+                                                       ['emergency_fund', 'house', 'car', 'education', 'vacation', 'wedding', 'retirement', 'investment', 'other'],
+                                                       index=['emergency_fund', 'house', 'car', 'education', 'vacation', 'wedding', 'retirement', 'investment', 'other'].index(goal['category']))
+                            edit_priority = st.selectbox("Priority", 
+                                                       ['low', 'medium', 'high'],
+                                                       index=['low', 'medium', 'high'].index(goal['priority']))
+                            edit_notes = st.text_area("Notes", value=goal.get('notes', ''))
+                            
+                            if st.form_submit_button("💾 Update Goal"):
+                                try:
+                                    updates = {
+                                        'goal_name': edit_name,
+                                        'target_amount': edit_target,
+                                        'current_amount': edit_current,
+                                        'category': edit_category,
+                                        'priority': edit_priority,
+                                        'notes': edit_notes
+                                    }
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
+                                    result = loop.run_until_complete(
+                                        goals_service.update_goal(goal['id'], updates)
+                                    )
+                                    loop.close()
+                                    if result:
+                                        st.success(f"✅ Updated {edit_name}!")
+                                        st.session_state[f"edit_goal_{goal['id']}"] = False
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Failed to update goal")
+                                except Exception as e:
+                                    st.error(f"❌ Failed to update goal: {str(e)}")
+                
+                st.markdown("---")
+    else:
+        st.info("🎯 **No goals set yet!** Create your first financial goal below.")
+    
+    # Add new goal form
+    st.markdown("---")
+    with st.expander("➕ Create New Financial Goal", expanded=len(goals) == 0):
+        with st.form("new_goal_form"):
+            st.subheader("🎯 Set a New Financial Goal")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                goal_name = st.text_input("Goal Name*", placeholder="e.g., Emergency Fund, New Car")
+                target_amount = st.number_input("Target Amount (₹)*", min_value=1000, value=100000, step=1000)
+                current_amount = st.number_input("Current Savings (₹)", min_value=0, value=0, step=1000)
+            
+            with col2:
+                category = st.selectbox("Category*", 
+                                      ['emergency_fund', 'house', 'car', 'education', 'vacation', 'wedding', 'retirement', 'investment', 'other'],
+                                      index=0)
+                priority = st.selectbox("Priority*", ['low', 'medium', 'high'], index=1)
+                target_date = st.date_input("Target Date (Optional)", value=None)
+            
+            notes = st.text_area("Notes/Description", placeholder="Additional details about your goal...")
+            
+            submitted = st.form_submit_button("🎯 Create Goal", type="primary")
+            
+            if submitted and goal_name and target_amount > 0:
+                goal_data = {
+                    'goal_name': goal_name,
+                    'target_amount': target_amount,
+                    'current_amount': current_amount,
+                    'category': category,
+                    'priority': priority,
+                    'notes': notes,
+                    'target_date': target_date.isoformat() if target_date else None
+                }
+                
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    result = loop.run_until_complete(
+                        goals_service.create_goal(user_id, goal_data)
+                    )
+                    loop.close()
+                    
+                    if result:
+                        st.success(f"✅ Goal '{goal_name}' created successfully!")
+                        st.balloons()
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to create goal. Please try again.")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error creating goal: {str(e)}")
+                    logger.error("Goal creation failed", error=str(e), user_id=user_id)
+
 # =====================================================
 # REAL-LIFE FEATURES WITH DATABASE INTEGRATION
 # =====================================================
@@ -980,19 +1212,35 @@ def show_salary_breakup():
     
     # Try to load existing data
     try:
-        result = db.table('salary_breakup').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(1).execute()
+        result = db.table('salary_breakup').select('*').eq('user_id', user_id).order('calculated_at', desc=True).limit(1).execute()
         existing_data = result.data[0] if result.data else None
     except Exception as e:
         st.warning(f"Could not load existing data: {e}")
         existing_data = None
+    
+    # Check if user is editing a calculation
+    editing_calculation = None
+    if 'selected_salary_calc' in st.session_state:
+        editing_calculation = st.session_state.selected_salary_calc
+        st.info("✏️ **Editing Calculation** - Modify the values below and save to update")
+        
+        # Button to cancel editing
+        if st.button("❌ Cancel Edit"):
+            del st.session_state.selected_salary_calc
+            st.rerun()
     
     col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("📊 Enter Your Salary Details")
         
-        # Pre-fill with existing data
-        default_ctc = float(existing_data['ctc']) if existing_data else 800000.0
+        # Pre-fill with existing data or editing data
+        if editing_calculation:
+            default_ctc = float(editing_calculation['ctc'])
+        elif existing_data:
+            default_ctc = float(existing_data['ctc'])
+        else:
+            default_ctc = 800000.0
         
         ctc = st.number_input(
             "Annual CTC (₹)", 
@@ -1006,12 +1254,24 @@ def show_salary_breakup():
         st.markdown("---")
         
         # Standard breakdown (40% Basic, 50% Allowances, 10% Bonus)
-        basic_percent = st.slider("Basic Salary %", 30, 60, 40, help="Typically 40-50% of CTC")
-        hra_percent = st.slider("HRA %", 10, 50, 30, help="Typically 30-40% of Basic")
+        # Calculate default percentages from editing data or use defaults
+        if editing_calculation:
+            default_basic_percent = int((editing_calculation['basic_salary'] / editing_calculation['ctc']) * 100)
+            default_hra_percent = int((editing_calculation['hra'] / editing_calculation['basic_salary']) * 100) if editing_calculation['basic_salary'] > 0 else 30
+            default_other_deductions_percent = int((editing_calculation['other_deductions'] / editing_calculation['ctc']) * 100)
+        else:
+            default_basic_percent = 40
+            default_hra_percent = 30
+            default_other_deductions_percent = 5
+        
+        basic_percent = st.slider("Basic Salary %", 30, 60, default_basic_percent, help="Typically 40-50% of CTC")
+        hra_percent = st.slider("HRA %", 10, 50, default_hra_percent, help="Typically 30-40% of Basic")
+        other_deductions_percent = st.slider("Other Deductions %", 0, 20, default_other_deductions_percent, help="Additional deductions as % of CTC")
         
         # Calculate components
         basic_salary = ctc * (basic_percent / 100)
         hra = basic_salary * (hra_percent / 100)
+        other_deductions = ctc * (other_deductions_percent / 100)
         special_allowance = ctc - basic_salary - hra
         
         # Deductions
@@ -1032,15 +1292,14 @@ def show_salary_breakup():
         # Health cess 4%
         income_tax = income_tax * 1.04
         
-        other_deductions = st.number_input("Other Deductions (₹/year)", 0, 100000, 5000, 1000)
-        
         # Calculate in-hand
         total_deductions = pf_contribution + professional_tax + income_tax + other_deductions
         in_hand_salary = ctc - total_deductions
         monthly_in_hand = in_hand_salary / 12
         
         # Save to database button
-        if st.button("💾 Save Salary Breakdown", type="primary"):
+        button_text = "💾 Update Salary Breakdown" if editing_calculation else "💾 Save Salary Breakdown"
+        if st.button(button_text, type="primary"):
             try:
                 data = {
                     'user_id': user_id,
@@ -1055,8 +1314,17 @@ def show_salary_breakup():
                     'in_hand_salary': float(in_hand_salary),
                     'calculated_at': datetime.now().isoformat()
                 }
-                db.table('salary_breakup').insert(data).execute()
-                st.success("✅ Salary breakdown saved to database!")
+                
+                if editing_calculation:
+                    # Update existing calculation
+                    db.table('salary_breakup').update(data).eq('id', editing_calculation['id']).execute()
+                    st.success("✅ Salary breakdown updated successfully!")
+                    del st.session_state.selected_salary_calc
+                else:
+                    # Insert new calculation
+                    db.table('salary_breakup').insert(data).execute()
+                    st.success("✅ Salary breakdown saved to database!")
+                
                 st.balloons()
                 # Reload page to show updated data
                 st.rerun()
@@ -1131,26 +1399,69 @@ def show_salary_breakup():
     st.markdown("---")
     st.subheader("📊 Your Saved Calculations")
     try:
-        history = db.table('salary_breakup').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(10).execute()
+        history = db.table('salary_breakup').select('*').eq('user_id', user_id).order('calculated_at', desc=True).limit(10).execute()
         if history.data and len(history.data) > 0:
             history_df = pd.DataFrame(history.data)
             history_df['calculated_at'] = pd.to_datetime(history_df['calculated_at']).dt.strftime('%Y-%m-%d %H:%M')
             
-            # Display formatted table
-            display_df = history_df[['calculated_at', 'ctc', 'in_hand_salary', 'income_tax', 'pf_contribution']].copy()
-            display_df.columns = ['Date & Time', 'CTC (₹)', 'In-Hand (₹)', 'Tax (₹)', 'PF (₹)']
+            # Add action columns for edit/delete
+            history_df['Actions'] = ''
             
-            st.dataframe(
-                display_df,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    'CTC (₹)': st.column_config.NumberColumn(format="₹%.0f"),
-                    'In-Hand (₹)': st.column_config.NumberColumn(format="₹%.0f"),
-                    'Tax (₹)': st.column_config.NumberColumn(format="₹%.0f"),
-                    'PF (₹)': st.column_config.NumberColumn(format="₹%.0f"),
-                }
-            )
+            # Display formatted table with actions
+            display_df = history_df[['calculated_at', 'ctc', 'in_hand_salary', 'income_tax', 'pf_contribution', 'Actions']].copy()
+            display_df.columns = ['Date & Time', 'CTC (₹)', 'In-Hand (₹)', 'Tax (₹)', 'PF (₹)', 'Actions']
+            
+            # Create columns for the table
+            col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 1])
+            
+            with col1:
+                st.markdown("**Date & Time**")
+            with col2:
+                st.markdown("**CTC (₹)**")
+            with col3:
+                st.markdown("**In-Hand (₹)**")
+            with col4:
+                st.markdown("**Tax (₹)**")
+            with col5:
+                st.markdown("**PF (₹)**")
+            with col6:
+                st.markdown("**Actions**")
+            
+            st.markdown("---")
+            
+            for idx, row in history_df.iterrows():
+                col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 1])
+                
+                with col1:
+                    st.write(row['calculated_at'])
+                with col2:
+                    st.write(f"₹{row['ctc']:,.0f}")
+                with col3:
+                    st.write(f"₹{row['in_hand_salary']:,.0f}")
+                with col4:
+                    st.write(f"₹{row['income_tax']:,.0f}")
+                with col5:
+                    st.write(f"₹{row['pf_contribution']:,.0f}")
+                with col6:
+                    # Action buttons
+                    edit_key = f"edit_{row['id']}"
+                    delete_key = f"delete_{row['id']}"
+                    
+                    if st.button("✏️", key=edit_key, help="Edit this calculation"):
+                        # Store the selected calculation for editing
+                        st.session_state.selected_salary_calc = row.to_dict()
+                        st.rerun()
+                    
+                    if st.button("🗑️", key=delete_key, help="Delete this calculation"):
+                        try:
+                            db.table('salary_breakup').delete().eq('id', row['id']).execute()
+                            st.success("✅ Calculation deleted successfully!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Failed to delete: {e}")
+                
+                st.markdown("---")
+            
             st.caption(f"📝 Showing {len(history.data)} most recent calculation(s)")
         else:
             st.info("💡 No saved calculations yet. Click '💾 Save Salary Breakdown' to store your calculation!")
@@ -2339,15 +2650,155 @@ def show_dashboard():
     has_goals = bool(goals_result.data)
     has_transactions = bool(transactions_result.data)
     
-    # Show welcome screen for new users
-    if not has_budget and not has_goals and not has_transactions:
-        st.markdown("""
-        <div style="text-align: center; padding: 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; color: white;">
-            <h1 style="font-size: 3rem; margin-bottom: 20px;">👋 Welcome to FinCA AI!</h1>
-            <p style="font-size: 1.3rem; margin-bottom: 30px;">Your Personal Financial Companion</p>
-            <p style="font-size: 1.1rem; opacity: 0.9;">Get started by creating your first budget or setting up a financial goal</p>
+    # Debug information (remove in production)
+    if st.sidebar.checkbox("🔍 Show Debug Info", value=False):
+        st.sidebar.write("**Debug Information:**")
+        st.sidebar.write(f"User ID: {user_id}")
+        st.sidebar.write(f"Has Budget: {has_budget} ({len(budgets_result.data) if budgets_result.data else 0} items)")
+        st.sidebar.write(f"Has Goals: {has_goals} ({len(goals_result.data) if goals_result.data else 0} items)")
+        st.sidebar.write(f"Has Transactions: {has_transactions} ({len(transactions_result.data) if transactions_result.data else 0} items)")
+    
+    # Welcome back section for users with data
+    if has_budget or has_goals or has_transactions:
+        # Get recent activity summary
+        recent_activities = []
+        try:
+            from src.services.vector_service import VectorService
+            vector_service = VectorService()
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            activities = loop.run_until_complete(
+                vector_service.get_user_activity_timeline(user_id, limit=3)
+            )
+            recent_activities = activities if activities else []
+        except:
+            recent_activities = []
+        
+        # Count user's data
+        budget_count = len(budgets_result.data) if has_budget else 0
+        goals_count = len(goals_result.data) if has_goals else 0
+        transactions_count = len(transactions_result.data) if has_transactions else 0
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; padding: 20px; margin-bottom: 20px; color: white;">
+            <h2 style="margin: 0 0 10px 0; font-size: 1.8rem;">🎉 Welcome back!</h2>
+            <p style="margin: 0 0 15px 0; font-size: 1.1rem; opacity: 0.9;">
+                Here's a quick overview of your financial journey:
+            </p>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="background: rgba(255,255,255,0.1); padding: 10px 15px; border-radius: 8px;">
+                    <strong>{budget_count}</strong> Budget{budget_count != 1 and 's' or ''}
+                </div>
+                <div style="background: rgba(255,255,255,0.1); padding: 10px 15px; border-radius: 8px;">
+                    <strong>{goals_count}</strong> Goal{goals_count != 1 and 's' or ''}
+                </div>
+                <div style="background: rgba(255,255,255,0.1); padding: 10px 15px; border-radius: 8px;">
+                    <strong>{transactions_count}</strong> Transaction{transactions_count != 1 and 's' or ''}
+                </div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Show recent activities in welcome section
+        if recent_activities:
+            st.markdown("#### 🔄 Your Recent Activities")
+            cols = st.columns(min(len(recent_activities), 3))
+            for i, activity in enumerate(recent_activities):
+                if i < 3:
+                    with cols[i]:
+                        activity_type = activity.get('type', 'activity')
+                        icon_map = {
+                            'budget': '💰',
+                            'goal': '🎯', 
+                            'transaction': '💳',
+                            'portfolio': '📊',
+                            'profile': '👤'
+                        }
+                        icon = icon_map.get(activity_type, '📝')
+                        st.markdown(f"""
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #667eea;">
+                            <div style="font-size: 2rem; margin-bottom: 5px;">{icon}</div>
+                            <div style="font-weight: bold; color: #333;">{activity_type.title()}</div>
+                            <div style="font-size: 0.9rem; color: #666; margin-top: 5px;">{activity.get('timestamp', 'recent')}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            st.markdown("---")
+    
+    # Check if user has no data but guest data exists
+    guest_user_id = 'guest-user-001'
+    guest_has_data = False
+    if not has_budget and not has_goals and not has_transactions:
+        try:
+            guest_budgets = db.table('budgets').select('*').eq('user_id', guest_user_id).execute()
+            guest_goals = db.table('goals').select('*').eq('user_id', guest_user_id).execute()
+            guest_transactions = db.table('transactions').select('*').eq('user_id', guest_user_id).execute()
+            guest_has_data = bool(guest_budgets.data or guest_goals.data or guest_transactions.data)
+        except:
+            guest_has_data = False
+    
+    # Show welcome screen for new users
+    if not has_budget and not has_goals and not has_transactions:
+        if guest_has_data:
+            # Show option to import guest data
+            st.markdown("""
+            <div style="text-align: center; padding: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; color: white; margin-bottom: 20px;">
+                <h1 style="font-size: 2.5rem; margin-bottom: 20px;">🎉 Welcome back!</h1>
+                <p style="font-size: 1.2rem; margin-bottom: 20px;">We found some data from your previous session</p>
+                <p style="font-size: 1rem; opacity: 0.9; margin-bottom: 30px;">Would you like to import your previous budgets, goals, and transactions?</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Import My Data", use_container_width=True, type="primary"):
+                    # Import guest data to current user
+                    try:
+                        # Import budgets
+                        for budget in guest_budgets.data:
+                            budget_copy = budget.copy()
+                            budget_copy['user_id'] = user_id
+                            budget_copy.pop('id', None)  # Remove id to create new record
+                            db.table('budgets').insert(budget_copy).execute()
+                        
+                        # Import goals
+                        for goal in guest_goals.data:
+                            goal_copy = goal.copy()
+                            goal_copy['user_id'] = user_id
+                            goal_copy.pop('id', None)
+                            db.table('goals').insert(goal_copy).execute()
+                        
+                        # Import transactions
+                        for transaction in guest_transactions.data:
+                            transaction_copy = transaction.copy()
+                            transaction_copy['user_id'] = user_id
+                            transaction_copy.pop('id', None)
+                            db.table('transactions').insert(transaction_copy).execute()
+                        
+                        st.success("✅ Data imported successfully! Refreshing dashboard...")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Failed to import data: {str(e)}")
+            
+            with col2:
+                if st.button("🚀 Start Fresh", use_container_width=True):
+                    # Clear guest data and show new user screen
+                    try:
+                        db.table('budgets').delete().eq('user_id', guest_user_id).execute()
+                        db.table('goals').delete().eq('user_id', guest_user_id).execute()
+                        db.table('transactions').delete().eq('user_id', guest_user_id).execute()
+                        st.success("🗑️ Previous data cleared. Starting fresh!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Failed to clear data: {str(e)}")
+        else:
+            # Regular new user welcome
+            st.markdown("""
+            <div style="text-align: center; padding: 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; color: white;">
+                <h1 style="font-size: 3rem; margin-bottom: 20px;">👋 Welcome to FinCA AI!</h1>
+                <p style="font-size: 1.3rem; margin-bottom: 30px;">Your Personal Financial Companion</p>
+                <p style="font-size: 1.1rem; opacity: 0.9;">Get started by creating your first budget or setting up a financial goal</p>
+            </div>
+            """, unsafe_allow_html=True)
         
         st.markdown("")
         st.markdown("")
@@ -2463,6 +2914,62 @@ def show_dashboard():
     
     st.markdown("---")
     
+    # Enhanced Activity Timeline - More Prominent Position
+    st.markdown("### 📈 Your Recent Activity")
+    st.markdown("*Stay updated with your financial journey*")
+    
+    # Get user activity from vector store
+    from src.services.vector_service import VectorService
+    vector_service = VectorService()
+    
+    try:
+        # Run async function to get user activity
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        activities = loop.run_until_complete(
+            vector_service.get_user_activity_timeline(user_id, limit=10)
+        )
+        
+        if activities:
+            # Create a more visually appealing timeline
+            for idx, activity in enumerate(activities):
+                activity_type = activity.get('type', 'activity')
+                content = activity.get('content', 'Activity recorded')
+                timestamp = activity.get('timestamp', 'recent')
+                
+                # Choose icon and color based on activity type
+                icon_color_map = {
+                    'budget': ('💰', '#FF6B6B'),
+                    'goal': ('🎯', '#4ECDC4'),
+                    'transaction': ('💳', '#45B7D1'),
+                    'portfolio': ('📊', '#FFA07A'),
+                    'profile': ('👤', '#98D8C8')
+                }
+                icon, color = icon_color_map.get(activity_type, ('📝', '#6BCF7F'))
+                
+                # Create timeline item with enhanced styling
+                st.markdown(f"""
+                <div style="display: flex; align-items: center; margin-bottom: 15px; padding: 12px; background: linear-gradient(90deg, {color}15 0%, rgba(255,255,255,0.8) 100%); border-radius: 10px; border-left: 4px solid {color};">
+                    <div style="font-size: 1.5rem; margin-right: 15px; color: {color};">{icon}</div>
+                    <div style="flex-grow: 1;">
+                        <div style="font-weight: bold; color: #333; margin-bottom: 2px;">{activity_type.title()}</div>
+                        <div style="color: #666; font-size: 0.9rem;">{content}</div>
+                    </div>
+                    <div style="color: #999; font-size: 0.8rem; text-align: right;">{timestamp}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Add a subtle separator except for the last item
+                if idx < len(activities) - 1:
+                    st.markdown("<div style='height: 1px; background: linear-gradient(90deg, transparent 0%, #e0e0e0 20%, #e0e0e0 80%, transparent 100%); margin: 8px 0;'></div>", unsafe_allow_html=True)
+        else:
+            st.info("📊 Your activity timeline will appear here as you use the app! Start by creating a budget or setting a goal.")
+    
+    except Exception as e:
+        st.warning(f"Could not load activity timeline: {str(e)}")
+    
+    st.markdown("---")
+    
     # Budget Overview Graph
     col1, col2 = st.columns(2)
     
@@ -2525,7 +3032,7 @@ def show_dashboard():
         tax_agent = TaxCalculatorAgent()
         
         annual_income = monthly_income * 12
-        deductions = {'80c': 150000, '80d': 0}
+        deductions = {'80c': 150000.0, '80d': 0.0}
         
         old_tax = tax_agent.calculate_tax(annual_income, 'old', deductions)
         new_tax = tax_agent.calculate_tax(annual_income, 'new', {})
@@ -2555,6 +3062,52 @@ def show_dashboard():
         
         st.success(f"💡 **Recommendation**: Choose **{better_regime}**")
         st.metric("Annual Tax Savings", f"₹{savings_amount:,.0f}")
+    
+    st.markdown("---")
+    
+    # Salary Breakup Summary
+    st.markdown("### 💰 Salary Breakup Summary")
+    
+    # Get salary breakup data
+    salary_result = db.table('salary_breakup').select('*').eq('user_id', user_id).order('calculated_at', desc=True).limit(1).execute()
+    
+    if salary_result.data:
+        latest_salary = salary_result.data[0]
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Latest CTC", f"₹{latest_salary['ctc']:,.0f}")
+        
+        with col2:
+            in_hand = latest_salary['in_hand_salary']
+            ctc = latest_salary['ctc']
+            take_home_pct = (in_hand / ctc) * 100
+            st.metric("Monthly Take-Home", f"₹{in_hand/12:,.0f}", f"{take_home_pct:.1f}% of CTC")
+        
+        with col3:
+            tax_amount = latest_salary['income_tax']
+            tax_pct = (tax_amount / ctc) * 100
+            st.metric("Annual Tax", f"₹{tax_amount:,.0f}", f"{tax_pct:.1f}% of CTC")
+        
+        # Quick breakdown
+        st.markdown("**Latest Salary Components:**")
+        components = {
+            'Basic Salary': latest_salary['basic_salary'],
+            'HRA': latest_salary['hra'],
+            'Special Allowance': latest_salary['special_allowance'],
+            'PF Contribution': latest_salary['pf_contribution'],
+            'Income Tax': latest_salary['income_tax'],
+            'Other Deductions': latest_salary['other_deductions']
+        }
+        
+        # Display as small metrics
+        cols = st.columns(3)
+        for i, (component, amount) in enumerate(components.items()):
+            with cols[i % 3]:
+                st.metric(component, f"₹{amount:,.0f}", f"{(amount/ctc)*100:.1f}%")
+    else:
+        st.info("💡 No salary calculations yet. Use the Salary Breakup Calculator to analyze your CTC!")
     
     st.markdown("---")
     
@@ -2723,56 +3276,207 @@ def process_chat_message(message: str):
     st.rerun()
 
 def show_budget():
-    """Budget manager"""
+    """Budget manager with database integration"""
     st.header("💰 Monthly Budget Manager")
+    
+    # Get user ID
+    user_id = st.session_state.user_id
+    
+    # Load existing budget if any
+    budget_service = services['budget']
+    
+    # Run async function to get current budget
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    current_budget = loop.run_until_complete(
+        budget_service.get_budget(user_id)
+    )
+    loop.close()
+    
+    if current_budget:
+        st.success("📊 Your current budget is loaded below. You can update it or create a new one.")
+        
+        # Display current budget summary
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Monthly Income", f"₹{current_budget['income']:,.0f}")
+        with col2:
+            total_expenses = current_budget['fixed_expenses'] + current_budget['variable_expenses']
+            st.metric("Total Expenses", f"₹{total_expenses:,.0f}")
+        with col3:
+            savings_rate = ((current_budget['savings'] + current_budget['investments']) / current_budget['income'] * 100) if current_budget['income'] > 0 else 0
+            st.metric("Savings Rate", f"{savings_rate:.1f}%")
     
     # Budget form
     with st.form("budget_form"):
-        st.subheader("Income")
-        monthly_income = st.number_input("Monthly Income (₹)", min_value=0, value=100000, step=1000)
+        st.subheader("💵 Income")
+        monthly_income = st.number_input("Monthly Income (₹)", 
+                                       min_value=0, 
+                                       value=int(current_budget['income']) if current_budget else 100000, 
+                                       step=1000)
         
-        st.subheader("Fixed Expenses")
-        rent = st.number_input("Rent (₹)", min_value=0, value=30000, step=1000)
-        utilities = st.number_input("Utilities (₹)", min_value=0, value=5000, step=500)
-        insurance = st.number_input("Insurance (₹)", min_value=0, value=3000, step=500)
+        st.subheader("🏠 Fixed Expenses")
+        col1, col2 = st.columns(2)
+        with col1:
+            rent = st.number_input("Rent/House Payment (₹)", 
+                                 min_value=0, 
+                                 value=30000, 
+                                 step=1000)
+            utilities = st.number_input("Utilities (Electricity, Water, Gas) (₹)", 
+                                      min_value=0, 
+                                      value=5000, 
+                                      step=500)
+        with col2:
+            insurance = st.number_input("Insurance Premiums (₹)", 
+                                      min_value=0, 
+                                      value=3000, 
+                                      step=500)
+            loan_emi = st.number_input("Loan EMI (₹)", 
+                                     min_value=0, 
+                                     value=0, 
+                                     step=1000)
         
-        st.subheader("Variable Expenses")
-        food = st.number_input("Food & Groceries (₹)", min_value=0, value=10000, step=1000)
-        transport = st.number_input("Transport (₹)", min_value=0, value=5000, step=500)
-        entertainment = st.number_input("Entertainment (₹)", min_value=0, value=5000, step=500)
+        st.subheader("🍽️ Variable Expenses")
+        col1, col2 = st.columns(2)
+        with col1:
+            food = st.number_input("Food & Groceries (₹)", 
+                                 min_value=0, 
+                                 value=10000, 
+                                 step=1000)
+            transport = st.number_input("Transport (Fuel/Public) (₹)", 
+                                      min_value=0, 
+                                      value=5000, 
+                                      step=500)
+        with col2:
+            entertainment = st.number_input("Entertainment & Shopping (₹)", 
+                                          min_value=0, 
+                                          value=5000, 
+                                          step=500)
+            miscellaneous = st.number_input("Miscellaneous (₹)", 
+                                          min_value=0, 
+                                          value=3000, 
+                                          step=500)
         
-        st.subheader("Savings & Investments")
-        savings = st.number_input("Savings (₹)", min_value=0, value=20000, step=1000)
-        investments = st.number_input("Investments (₹)", min_value=0, value=15000, step=1000)
+        st.subheader("💰 Savings & Investments")
+        col1, col2 = st.columns(2)
+        with col1:
+            savings = st.number_input("Emergency Savings (₹)", 
+                                    min_value=0, 
+                                    value=20000, 
+                                    step=1000)
+        with col2:
+            investments = st.number_input("Investments (SIP, Stocks, etc.) (₹)", 
+                                        min_value=0, 
+                                        value=15000, 
+                                        step=1000)
         
-        submitted = st.form_submit_button("💾 Save Budget")
+        # Custom expense categories
+        st.subheader("📊 Custom Expense Categories")
+        st.markdown("*Add specific categories for better tracking*")
+        
+        custom_categories = st.text_area(
+            "Custom Categories (one per line, format: Category:Amount)", 
+            placeholder="Medical:5000\nEducation:3000\nTravel:8000",
+            height=100
+        )
+        
+        submitted = st.form_submit_button("💾 Save Budget", type="primary")
         
         if submitted:
+            # Parse custom categories
+            allocations = {}
+            fixed_expenses_breakdown = {}
+            variable_expenses_breakdown = {}
+            
+            if custom_categories.strip():
+                for line in custom_categories.strip().split('\n'):
+                    if ':' in line:
+                        category, amount_str = line.split(':', 1)
+                        try:
+                            amount = float(amount_str.strip())
+                            allocations[category.strip()] = amount
+                            # Categorize as variable expenses for now
+                            variable_expenses_breakdown[category.strip()] = amount
+                        except ValueError:
+                            st.warning(f"Invalid amount for category '{category.strip()}'. Skipping.")
+            
+            # Add standard categories to allocations
+            allocations.update({
+                'Rent': rent,
+                'Utilities': utilities,
+                'Insurance': insurance,
+                'Loan EMI': loan_emi,
+                'Food': food,
+                'Transport': transport,
+                'Entertainment': entertainment,
+                'Miscellaneous': miscellaneous,
+                'Savings': savings,
+                'Investments': investments
+            })
+            
             budget_data = {
                 'income': monthly_income,
-                'fixed_expenses': rent + utilities + insurance,
-                'variable_expenses': food + transport + entertainment,
+                'fixed_expenses': rent + utilities + insurance + loan_emi,
+                'variable_expenses': food + transport + entertainment + miscellaneous + sum(variable_expenses_breakdown.values()),
                 'savings': savings,
                 'investments': investments,
+                'fixed_expenses_breakdown': {
+                    'Rent': rent,
+                    'Utilities': utilities,
+                    'Insurance': insurance,
+                    'Loan EMI': loan_emi
+                },
+                'variable_expenses_breakdown': {
+                    'Food': food,
+                    'Transport': transport,
+                    'Entertainment': entertainment,
+                    'Miscellaneous': miscellaneous,
+                    **variable_expenses_breakdown
+                },
+                'allocations': allocations,
                 'month': datetime.now().strftime('%Y-%m')
             }
             
-            st.session_state.current_budget = budget_data
-            
-            # Calculate summary
-            budget_service = services['budget']
-            summary = budget_service.calculate_budget_summary(budget_data)
-            
-            st.success("✅ Budget saved successfully!")
-            
-            # Display summary
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Income", f"₹{summary['total_income']:,.0f}")
-            with col2:
-                st.metric("Total Expenses", f"₹{summary['total_expenses']:,.0f}")
-            with col3:
-                st.metric("Savings Rate", f"{summary['savings_rate']:.1f}%")
+            # Save to database
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(
+                    budget_service.create_budget(user_id, budget_data)
+                )
+                loop.close()
+                
+                if result:
+                    st.success("✅ Budget saved successfully to database!")
+                    
+                    # Calculate and display summary
+                    summary = budget_service.calculate_budget_summary(budget_data)
+                    
+                    st.markdown("### 📊 Budget Summary")
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Total Income", f"₹{summary['total_income']:,.0f}")
+                    with col2:
+                        st.metric("Total Expenses", f"₹{summary['total_expenses']:,.0f}")
+                    with col3:
+                        st.metric("Total Savings", f"₹{summary['total_savings']:,.0f}")
+                    with col4:
+                        st.metric("Savings Rate", f"{summary['savings_rate']:.1f}%")
+                    
+                    if summary['is_balanced']:
+                        st.success(f"✅ Budget is balanced! You have ₹{summary['balance']:,.0f} left for discretionary spending.")
+                    else:
+                        st.warning(f"⚠️ Budget exceeds income by ₹{abs(summary['balance']):,.0f}. Consider reducing expenses or increasing income.")
+                    
+                    # Refresh page to show updated dashboard
+                    st.info("🔄 Dashboard will be updated with your new budget data.")
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to save budget. Please try again.")
+                    
+            except Exception as e:
+                st.error(f"❌ Error saving budget: {str(e)}")
+                logger.error("Budget save failed", error=str(e), user_id=user_id)
 
 def show_goals():
     """Financial goals manager with full CRUD operations"""
