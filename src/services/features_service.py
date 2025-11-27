@@ -86,6 +86,32 @@ class FeaturesService:
             logger.error(f"Error fetching challenges: {e}")
             return []
 
+    def get_user_stats(self, user_id: str):
+        try:
+            # Get user score from leaderboard
+            leaderboard_data = self.supabase.table("leaderboard").select("*").eq("user_id", user_id).execute().data
+            score = leaderboard_data[0]['score'] if leaderboard_data else 0
+
+            # Get completed challenges count
+            completed_challenges = len(self.supabase.table("user_achievements").select("*").eq("user_id", user_id).execute().data)
+
+            # Get user rank
+            all_scores = self.supabase.table("leaderboard").select("score").order("score", desc=True).execute().data
+            rank = next((i + 1 for i, item in enumerate(all_scores) if item['score'] <= score), len(all_scores) + 1)
+
+            return {
+                'total_score': score,
+                'completed_challenges': completed_challenges,
+                'rank': rank
+            }
+        except Exception as e:
+            logger.error(f"Error fetching user stats: {e}")
+            return {
+                'total_score': 0,
+                'completed_challenges': 0,
+                'rank': 'N/A'
+            }
+
     # --- NOTIFICATIONS ---
     def get_notifications(self, user_id: str):
         try:

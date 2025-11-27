@@ -23,6 +23,7 @@ from src.utils.session_manager import SessionManager
 from src.services.auth_service import AuthService
 from src.ui.pages.features.portfolio_tracker import show_portfolio_tracker
 from src.ui.pages.features.gamification import show_gamification_hub
+from src.ui.pages.features.news import show_news_page
 from src.services.features_service import FeaturesService
 
 # Initialize logger
@@ -2214,7 +2215,7 @@ def main():
         st.markdown("### 🎯 Navigation")
         
         # Navigation pages with admin dashboard for admins
-        pages = ["🏠 Dashboard", "💰 Budget", "🎯 Goals", "📈 Portfolio", "🏆 Rewards & News",
+        pages = ["🏠 Dashboard", "💰 Budget", "🎯 Goals", "📈 Portfolio", "🏆 Rewards", "📰 News",
                  "💬 Chat Assistant", "📊 Tax Calculator", "📈 SIP Planner", "🏡 HRA Calculator", 
                  "💳 EMI Calculator", "💎 80C Comparator", "🏖️ Retirement Planner",
                  "📊 Expense Analytics", "👤 Profile",
@@ -2280,8 +2281,10 @@ def main():
         show_goals()
     elif page == "📈 Portfolio":
         show_portfolio_tracker()
-    elif page == "🏆 Rewards & News":
+    elif page == "🏆 Rewards":
         show_gamification_hub()
+    elif page == "📰 News":
+        show_news_page()
     elif page == "💬 Chat Assistant":
         show_chat()
     elif page == "📊 Tax Calculator":

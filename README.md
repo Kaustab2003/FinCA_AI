@@ -65,6 +65,15 @@ python scripts/setup_db.py
 streamlit run src/ui/streamlit_app.py
 ```
 
+### News Automation Setup (Optional)
+```bash
+# Manual news fetch
+python scripts/fetch_and_store_news.py
+
+# Automated news fetching (Windows Task Scheduler)
+# Schedule scripts\run_news_fetcher.bat to run every hour
+```
+
 ### Generate Encryption Key
 ```python
 from cryptography.fernet import Fernet
@@ -192,11 +201,19 @@ Score = 30% Savings Rate + 25% Emergency Fund +
 - Annual tax estimate
 - Downloadable tax report
 
-### 4. SIP Calculator
-- Goal-based calculation
-- Risk-adjusted returns
-- Asset allocation (Equity/Debt/Gold)
-- Affordability check against savings
+### 5. Financial News & Sentiment Analysis 📰
+- **Alpha Vantage Integration**: Real-time financial news with sentiment analysis
+- **Sentiment Scoring**: Bullish/Bearish/Neutral classification for market insights
+- **Smart Filtering**: Filter by sentiment, time period, and categories
+- **Automated Updates**: Scheduled news fetching every hour
+- **Market Intelligence**: Stay informed with latest financial developments
+
+### 6. Gamification & Rewards 🏆
+- **Achievement System**: Badges for financial milestones
+- **Leaderboards**: Anonymous peer comparison
+- **Challenges**: Daily/weekly financial tasks
+- **Progress Tracking**: Visual progress indicators
+- **Reward Points**: Earn points for app engagement
 
 ### 5. Budget Tracker
 - Income/expenses categorization
