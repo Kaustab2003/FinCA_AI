@@ -18,19 +18,18 @@ class ChatService:
     async def process_message(self, user_id: str, message: str, user_context: Dict[str, Any]) -> Dict[str, Any]:
         """Process a chat message and get AI response"""
         try:
-            # Skip database saves (table not created yet)
-            # await self.save_message(user_id, 'user', message)
+            # Save user message to chat history
+            await self.save_message(user_id, 'user', message)
             
             # Get AI response from supervisor
             response = await self.supervisor.process(message, user_context)
             
-            # Skip database saves (table not created yet)
-            # await self.save_message(user_id, 'assistant', response.content, {
-            #     'agent_type': response.agent_type,
-            #     'agent_name': response.agent_name,
-            #     'confidence': response.confidence,
-            #     'tools_used': response.tools_used
-            # })
+            # Save assistant response to chat history
+            await self.save_message(user_id, 'assistant', response.content, {
+                'agent_type': response.agent_type,
+                'confidence': response.confidence,
+                'tool_calls': response.tools_used
+            })
             
             logger.info("Chat message processed", 
                        user_id=user_id,
@@ -61,7 +60,10 @@ class ChatService:
             data = {
                 'user_id': user_id,
                 'role': role,
-                'content': content,
+                'message': content,  # Database column is 'message'
+                'agent_type': metadata.get('agent_type') if metadata else None,
+                'confidence': metadata.get('confidence') if metadata else None,
+                'tool_calls': metadata.get('tool_calls') if metadata else None,
                 'metadata': metadata or {}
             }
             

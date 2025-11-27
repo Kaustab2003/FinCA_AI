@@ -24,6 +24,9 @@ class BudgetService:
                 'variable_expenses': budget_data.get('variable_expenses', 0),
                 'savings': budget_data.get('savings', 0),
                 'investments': budget_data.get('investments', 0),
+                'fixed_expenses_breakdown': budget_data.get('fixed_expenses_breakdown', {}),
+                'variable_expenses_breakdown': budget_data.get('variable_expenses_breakdown', {}),
+                'allocations': budget_data.get('allocations', {}),
                 'notes': budget_data.get('notes', '')
             }
             

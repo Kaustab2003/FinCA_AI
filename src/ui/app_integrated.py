@@ -17,8 +17,10 @@ from src.services.chat_service import ChatService
 from src.services.budget_service import BudgetService
 from src.services.goals_service import GoalsService
 from src.services.user_service import UserService
-from src.agents.rag_knowledge_agent import FinancialKnowledgeAgent
-from src.utils.document_loader import IndianFinancialDocuments
+# from src.agents.rag_knowledge_agent import FinancialKnowledgeAgent  # Moved to local import
+# from src.utils.document_loader import IndianFinancialDocuments  # Moved to local import
+from src.utils.session_manager import SessionManager
+from src.services.auth_service import AuthService
 
 # Initialize logger
 logger.info("Starting FinCA AI application")
@@ -83,33 +85,36 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Initialize services
-@st.cache_resource
 def get_services():
-    """Initialize and cache service instances"""
-    return {
-        'chat': ChatService(),
-        'budget': BudgetService(),
-        'goals': GoalsService(),
-        'user': UserService(),
-        'metrics': MetricsCalculator()
-    }
+    """Initialize service instances per user session"""
+    if 'services' not in st.session_state:
+        st.session_state.services = {
+            'chat': ChatService(),
+            'budget': BudgetService(),
+            'goals': GoalsService(),
+            'user': UserService(),
+            'metrics': MetricsCalculator()
+        }
+    return st.session_state.services
 
 services = get_services()
 
+# =====================================================
 # Initialize session state
-if 'user_id' not in st.session_state:
-    st.session_state.user_id = 'demo_user_123'  # In production, get from auth
-if 'user_context' not in st.session_state:
-    st.session_state.user_context = {
-        'salary': 1200000,  # ₹12L annual
-        'age': 28,
-        'risk_profile': 'moderate',
-        'city': 'Bangalore'
-    }
+# =====================================================
 if 'chat_messages' not in st.session_state:
     st.session_state.chat_messages = []
 if 'current_budget' not in st.session_state:
     st.session_state.current_budget = {}
+
+# Initialize default values only if user context exists (authenticated)
+if 'user_context' in st.session_state and st.session_state.user_context:
+    if 'email' not in st.session_state:
+        st.session_state.email = st.session_state.user_context.get('email', '')
+    if 'role' not in st.session_state:
+        st.session_state.role = st.session_state.user_context.get('role', 'user')
+    if 'user_id' not in st.session_state:
+        st.session_state.user_id = st.session_state.user_context.get('user_id', '')
 
 def show_hra_calculator():
     """HRA Tax Exemption Calculator"""
@@ -966,7 +971,7 @@ def show_salary_breakup():
     # Get database client
     from src.config.database import DatabaseClient
     db = DatabaseClient.get_client()
-    user_id = st.session_state.user_context.get('email', 'demo_user_123')
+    user_id = st.session_state.user_id
     
     # Try to load existing data
     try:
@@ -1160,7 +1165,7 @@ def show_bill_reminder():
     # Get database client
     from src.config.database import DatabaseClient
     db = DatabaseClient.get_client()
-    user_id = st.session_state.user_context.get('email', 'demo_user_123')
+    user_id = st.session_state.user_id
     
     # Load existing bills
     try:
@@ -1417,7 +1422,7 @@ def show_credit_card_optimizer():
     # Get database client
     from src.config.database import DatabaseClient
     db = DatabaseClient.get_client()
-    user_id = st.session_state.user_context.get('email', 'demo_user_123')
+    user_id = st.session_state.user_id
     
     # Load existing cards
     try:
@@ -1667,7 +1672,7 @@ def show_fd_vs_debt_fund():
     # Get database client
     from src.config.database import DatabaseClient
     db = DatabaseClient.get_client()
-    user_id = st.session_state.user_context.get('email', 'demo_user_123')
+    user_id = st.session_state.user_id
     
     col1, col2 = st.columns([1, 2])
     
@@ -1778,11 +1783,8 @@ def show_fd_vs_debt_fund():
     # Save calculation
     if st.button("💾 Save This Comparison", type="primary"):
         try:
-            data = {
-                'user_id': user_id,
-                'investment_type': 'FD vs Debt Fund',
-                'principal_amount': float(principal),
-                'time_period': time_period,
+            # Pack detailed metrics into comparison_data JSON
+            comparison_details = {
                 'investment_horizon': 'Long-term' if time_period >= 36 else 'Short-term' if time_period <= 12 else 'Medium-term',
                 'fd_rate': float(fd_rate),
                 'fd_maturity': float(fd_maturity),
@@ -1791,8 +1793,16 @@ def show_fd_vs_debt_fund():
                 'debt_fund_return': float(debt_fund_return),
                 'debt_fund_maturity': float(debt_maturity),
                 'debt_fund_tax_amount': float(debt_tax),
-                'debt_fund_post_tax_return': float(debt_post_tax),
+                'debt_fund_post_tax_return': float(debt_post_tax)
+            }
+            
+            data = {
+                'user_id': user_id,
+                'investment_type': 'FD vs Debt Fund',
+                'principal_amount': float(principal),
+                'time_period': time_period,
                 'recommended_option': winner,
+                'comparison_data': comparison_details,
                 'calculation_date': datetime.now().isoformat()
             }
             db.table('investment_comparisons').insert(data).execute()
@@ -1840,9 +1850,31 @@ def show_fd_vs_debt_fund():
             result = db.table('investment_comparisons').select('*').eq('user_id', user_id).order('calculation_date', desc=True).limit(10).execute()
             if result.data:
                 history_df = pd.DataFrame(result.data)
-                history_df['calculation_date'] = pd.to_datetime(history_df['calculation_date']).dt.strftime('%Y-%m-%d')
-                display_cols = ['calculation_date', 'principal_amount', 'time_period', 'recommended_option', 'fd_post_tax_return', 'debt_fund_post_tax_return']
+                
+                # Extract metrics from comparison_data JSON
+                if 'comparison_data' in history_df.columns:
+                    # Normalize the JSON column into separate columns
+                    # Convert Series to list of dicts for json_normalize and handle potential None/NaN
+                    comparison_data_list = history_df['comparison_data'].tolist()
+                    comparison_data_list = [x if isinstance(x, dict) else {} for x in comparison_data_list]
+                    
+                    json_df = pd.json_normalize(comparison_data_list)
+                    json_df.index = history_df.index
+                    history_df = pd.concat([history_df.drop('comparison_data', axis=1), json_df], axis=1)
+                
+                history_df['calculation_date'] = pd.to_datetime(history_df['calculation_date'])
+                history_df['calculation_date'] = history_df['calculation_date'].dt.strftime('%Y-%m-%d')
+                
+                # Select columns to display (handle missing columns gracefully)
+                display_cols = ['calculation_date', 'principal_amount', 'time_period', 'recommended_option']
+                if 'fd_post_tax_return' in history_df.columns:
+                    display_cols.append('fd_post_tax_return')
+                if 'debt_fund_post_tax_return' in history_df.columns:
+                    display_cols.append('debt_fund_post_tax_return')
+                    
                 st.dataframe(history_df[display_cols], use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.error(f"Failed to load history: {e}")
         except Exception as e:
             st.info("No previous comparisons found.")
 
@@ -1858,7 +1890,7 @@ def show_quick_money_moves():
     # Get database client
     from src.config.database import DatabaseClient
     db = DatabaseClient.get_client()
-    user_id = st.session_state.user_context.get('email', 'demo_user_123')
+    user_id = st.session_state.user_id
     
     # Load moves
     try:
@@ -2121,22 +2153,62 @@ def show_quick_money_moves():
 def main():
     """Main application entry point"""
     
+    # Authentication check
+    if not SessionManager.is_authenticated():
+        # Show login page
+        from src.ui.pages.auth.login import show_login
+        from src.ui.pages.auth.register import show_register
+        
+        # Show auth page based on session flag
+        if st.session_state.get('show_register', False):
+            show_register()
+        else:
+            show_login()
+        return
+    
     # Header
     st.markdown('<h1 class="main-header">💰 FinCA AI</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #666;">Your Personal Finance Copilot for India</p>', unsafe_allow_html=True)
     
     # Sidebar navigation
     with st.sidebar:
+        # App branding
+        st.markdown("### 💰 FinCA AI")
+        st.caption("Your Personal Finance Copilot")
+        
+        # User info
+        st.markdown("---")
+        email = SessionManager.get_user_email()
+        user_name = email.split('@')[0] if email else "User"
+        user_role = SessionManager.get_user_role()
+        st.markdown(f"👤 **{user_name}**")
+        st.caption(f"Role: {user_role.capitalize() if user_role else 'Unknown'}")
+        
+        # Logout button
+        if st.button("🚪 Logout", use_container_width=True):
+            auth_service = AuthService()
+            auth_service.sign_out()
+            SessionManager.clear_user_session()
+            st.rerun()
+        
+        st.markdown("---")
         st.markdown("### 🎯 Navigation")
+        
+        # Navigation pages with admin dashboard for admins
+        pages = ["🏠 Dashboard", "💰 Budget", "🎯 Goals", "💬 Chat Assistant", 
+                 "📊 Tax Calculator", "📈 SIP Planner", "🏡 HRA Calculator", 
+                 "💳 EMI Calculator", "💎 80C Comparator", "🏖️ Retirement Planner",
+                 "📊 Expense Analytics", "👤 Profile",
+                 "💰 Salary Breakup", "📱 Bill Reminder", "💳 Credit Card Optimizer",
+                 "🏦 FD vs Debt Fund", "⚡ Quick Money Moves", "📚 Knowledge Base"]
+        
+        # Add admin dashboard for admin users
+        if SessionManager.is_admin():
+            pages.insert(1, "🛡️ Admin Dashboard")
         
         page = st.radio(
             "Select Page",
-            ["🏠 Dashboard", "💰 Budget", "🎯 Goals", "💬 Chat Assistant", 
-             "📊 Tax Calculator", "📈 SIP Planner", "🏡 HRA Calculator", 
-             "💳 EMI Calculator", "💎 80C Comparator", "🏖️ Retirement Planner",
-             "📊 Expense Analytics", "👤 Profile",
-             "💰 Salary Breakup", "📱 Bill Reminder", "💳 Credit Card Optimizer",
-             "🏦 FD vs Debt Fund", "⚡ Quick Money Moves", "📚 Knowledge Base"],
+            pages,
             label_visibility="collapsed"
         )
         
@@ -2180,6 +2252,9 @@ def main():
     # Route to selected page
     if page == "🏠 Dashboard":
         show_dashboard()
+    elif page == "🛡️ Admin Dashboard":
+        from src.ui.pages.admin.admin_dashboard import show_admin_dashboard
+        show_admin_dashboard()
     elif page == "💰 Budget":
         show_budget()
     elif page == "🎯 Goals":
@@ -2223,21 +2298,101 @@ def show_dashboard():
     
     st.header("🏠 Dashboard")
     
-    # Calculate metrics
+    # Get real data from database
+    from src.config.database import DatabaseClient
+    db = DatabaseClient.get_client()
+    user_id = st.session_state.user_id
+    
+    # Fetch user's budget data
+    budgets_result = db.table('budgets').select('*').eq('user_id', user_id).execute()
+    goals_result = db.table('goals').select('*').eq('user_id', user_id).execute()
+    transactions_result = db.table('transactions').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(10).execute()
+    
+    # Check if user has any data
+    has_budget = bool(budgets_result.data)
+    has_goals = bool(goals_result.data)
+    has_transactions = bool(transactions_result.data)
+    
+    # Show welcome screen for new users
+    if not has_budget and not has_goals and not has_transactions:
+        st.markdown("""
+        <div style="text-align: center; padding: 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; color: white;">
+            <h1 style="font-size: 3rem; margin-bottom: 20px;">👋 Welcome to FinCA AI!</h1>
+            <p style="font-size: 1.3rem; margin-bottom: 30px;">Your Personal Financial Companion</p>
+            <p style="font-size: 1.1rem; opacity: 0.9;">Get started by creating your first budget or setting up a financial goal</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("")
+        st.markdown("")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("""
+            <div style="padding: 30px; background: white; border-radius: 15px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h3>💰 Create Budget</h3>
+                <p>Track your income and expenses</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("""
+            <div style="padding: 30px; background: white; border-radius: 15px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h3>🎯 Set Goals</h3>
+                <p>Plan for your financial future</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown("""
+            <div style="padding: 30px; background: white; border-radius: 15px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h3>💬 Chat with AI</h3>
+                <p>Get personalized advice</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.stop()
+    
+    # Calculate metrics from real data
     calculator = services['metrics']
-    salary = st.session_state.user_context.get('salary', 0)
-    monthly_income = salary / 12 if salary > 0 else 100000
+    
+    # Get income from budget
+    monthly_income = 0
+    monthly_expenses = 0
+    monthly_savings = 0
+    
+    if has_budget:
+        budget = budgets_result.data[0]
+        monthly_income = float(budget.get('income', 0))
+        
+        # Calculate expenses from budget allocations (stored in JSONB)
+        allocations = budget.get('allocations', {})
+        if isinstance(allocations, dict):
+            monthly_expenses = sum(float(v) for v in allocations.values() if v)
+        
+        # Calculate savings
+        monthly_savings = monthly_income - monthly_expenses
+    
+    # Get emergency fund from user profile or calculate
+    emergency_fund = monthly_income * 3 if monthly_income > 0 else 0
+    
+    # Get EMI data from transactions
+    monthly_emi = 0
+    if has_transactions:
+        emi_transactions = [t for t in transactions_result.data if 'emi' in t.get('description', '').lower() or 'loan' in t.get('description', '').lower()]
+        monthly_emi = sum(abs(float(t.get('amount', 0))) for t in emi_transactions)
     
     user_data = {
         'monthly_income': monthly_income,
-        'monthly_expenses': monthly_income * 0.4,
-        'monthly_savings': monthly_income * 0.3,
-        'emergency_fund': monthly_income * 3,
-        'monthly_emi': monthly_income * 0.15,
-        'goals': [],
+        'monthly_expenses': monthly_expenses,
+        'monthly_savings': monthly_savings,
+        'emergency_fund': emergency_fund,
+        'monthly_emi': monthly_emi,
+        'goals': goals_result.data if has_goals else [],
         'days_active': 30,
-        'budgets_logged': 3,
-        'goals_set': 2
+        'budgets_logged': len(budgets_result.data) if has_budget else 0,
+        'goals_set': len(goals_result.data) if has_goals else 0
     }
     
     total_score, components = calculator.calculate_finca_score(**user_data)
@@ -2288,36 +2443,53 @@ def show_dashboard():
     with col1:
         st.markdown("### 💰 Budget Overview")
         
-        # Budget breakdown data
-        budget_data = {
-            'Category': ['Housing', 'Food & Groceries', 'Transport', 'Entertainment', 'Insurance', 'Savings', 'Investments', 'Other'],
-            'Amount': [30000, 10000, 5000, 5000, 3000, 20000, 15000, 12000]
-        }
+        # Get real budget data from database
+        if has_budget:
+            budget = budgets_result.data[0]
+            allocations = budget.get('allocations', {})
+            
+            # Extract categories and amounts
+            if isinstance(allocations, dict) and allocations:
+                budget_data = {
+                    'Category': list(allocations.keys()),
+                    'Amount': [float(v) for v in allocations.values()]
+                }
+            else:
+                st.info("📊 No budget breakdown available. Add categories to your budget!")
+                budget_data = None
+        else:
+            st.info("📊 No budget yet. Create your first budget!")
+            budget_data = None
         
-        # Create pie chart
-        fig_budget = go.Figure(data=[go.Pie(
-            labels=budget_data['Category'],
-            values=budget_data['Amount'],
+        if budget_data:
+            # Create pie chart
+            fig_budget = go.Figure(data=[go.Pie(
+                labels=budget_data['Category'],
+                values=budget_data['Amount'],
             hole=0.4,
             marker=dict(colors=['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#6BCF7F', '#F7DC6F', '#BB8FCE']),
             textinfo='label+percent',
             textposition='outside'
         )])
         
-        fig_budget.update_layout(
-            title="Monthly Expense Distribution",
-            showlegend=False,
-            height=350,
-            margin=dict(t=50, b=20, l=20, r=20)
-        )
-        
-        st.plotly_chart(fig_budget, use_container_width=True)
-        
-        # Summary metrics
-        total_expenses = sum(budget_data['Amount'])
-        st.metric("Total Monthly Expenses", f"₹{total_expenses:,.0f}")
-        st.metric("Remaining Balance", f"₹{monthly_income - total_expenses:,.0f}", 
-                 delta=f"{((monthly_income - total_expenses) / monthly_income * 100):.1f}%")
+            fig_budget.update_layout(
+                title="Monthly Expense Distribution",
+                showlegend=False,
+                height=350,
+                margin=dict(t=50, b=20, l=20, r=20)
+            )
+            
+            st.plotly_chart(fig_budget, use_container_width=True)
+            
+            # Summary metrics
+            total_expenses = sum(budget_data['Amount'])
+            st.metric("Total Monthly Expenses", f"₹{total_expenses:,.0f}")
+            remaining = monthly_income - total_expenses
+            if monthly_income > 0:
+                st.metric("Remaining Balance", f"₹{remaining:,.0f}", 
+                         delta=f"{(remaining / monthly_income * 100):.1f}%")
+            else:
+                st.metric("Remaining Balance", f"₹{remaining:,.0f}")
     
     with col2:
         st.markdown("### 📊 Tax Regime Comparison")
@@ -2363,23 +2535,27 @@ def show_dashboard():
     # Recent Transactions
     st.markdown("### 💳 Recent Transactions")
     
-    # Sample transaction data
-    if 'transactions' not in st.session_state:
-        st.session_state.transactions = [
-            {'date': (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'), 'description': 'Salary Credit', 'category': 'Income', 'amount': 100000, 'type': 'credit'},
-            {'date': (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d'), 'description': 'Rent Payment', 'category': 'Housing', 'amount': -30000, 'type': 'debit'},
-            {'date': (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d'), 'description': 'Grocery Shopping', 'category': 'Food', 'amount': -3500, 'type': 'debit'},
-            {'date': (datetime.now() - timedelta(days=4)).strftime('%Y-%m-%d'), 'description': 'SIP Investment', 'category': 'Investment', 'amount': -15000, 'type': 'debit'},
-            {'date': (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d'), 'description': 'Electricity Bill', 'category': 'Utilities', 'amount': -2500, 'type': 'debit'},
-            {'date': (datetime.now() - timedelta(days=6)).strftime('%Y-%m-%d'), 'description': 'Fuel', 'category': 'Transport', 'amount': -3000, 'type': 'debit'},
-            {'date': (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'), 'description': 'Restaurant', 'category': 'Entertainment', 'amount': -1800, 'type': 'debit'},
-            {'date': (datetime.now() - timedelta(days=8)).strftime('%Y-%m-%d'), 'description': 'Health Insurance', 'category': 'Insurance', 'amount': -3000, 'type': 'debit'},
-            {'date': (datetime.now() - timedelta(days=9)).strftime('%Y-%m-%d'), 'description': 'Amazon Purchase', 'category': 'Shopping', 'amount': -2200, 'type': 'debit'},
-            {'date': (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d'), 'description': 'Fixed Deposit', 'category': 'Savings', 'amount': -20000, 'type': 'debit'},
-        ]
+    # Get real transactions from database
+    if has_transactions:
+        transactions_list = transactions_result.data
+        
+        # Format transactions for display
+        formatted_transactions = []
+        for txn in transactions_list:
+            amount = float(txn.get('amount', 0))
+            formatted_transactions.append({
+                'date': txn.get('created_at', '')[:10],  # Extract date from timestamp
+                'description': txn.get('description', 'Transaction'),
+                'category': txn.get('category', 'Other'),
+                'amount': amount,
+                'type': 'credit' if amount > 0 else 'debit'
+            })
+    else:
+        st.info("📊 No transactions yet. Start tracking your expenses!")
+        formatted_transactions = []
     
     # Transaction table with styling
-    for idx, txn in enumerate(st.session_state.transactions[:10]):
+    for idx, txn in enumerate(formatted_transactions[:10]):
         col1, col2, col3, col4 = st.columns([2, 3, 2, 2])
         
         # Color coding
@@ -2402,13 +2578,13 @@ def show_dashboard():
             else:
                 st.error("Debit", icon="⬇️")
         
-        if idx < len(st.session_state.transactions[:10]) - 1:
+        if idx < len(formatted_transactions[:10]) - 1:
             st.markdown("<hr style='margin: 0.5rem 0; opacity: 0.2;'>", unsafe_allow_html=True)
     
     # View all transactions button
-    if len(st.session_state.transactions) > 10:
+    if len(formatted_transactions) > 10:
         if st.button("📋 View All Transactions"):
-            st.info(f"Showing {len(st.session_state.transactions)} total transactions")
+            st.info(f"Showing {len(formatted_transactions)} total transactions")
     
     st.markdown("---")
     
@@ -2898,6 +3074,10 @@ def show_profile():
 
 def show_knowledge_base():
     """Financial Knowledge Base using LangChain RAG"""
+    # Lazy import to speed up app startup
+    from src.agents.rag_knowledge_agent import FinancialKnowledgeAgent
+    from src.utils.document_loader import IndianFinancialDocuments
+
     st.header("📚 Financial Knowledge Base")
     st.markdown("Ask any question about Indian taxes, investments, savings, or personal finance!")
     

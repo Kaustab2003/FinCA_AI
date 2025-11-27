@@ -105,17 +105,15 @@ class GoalsService:
             
             # Update current amount
             new_amount = goal['current_amount'] + amount
-            progress = (new_amount / goal['target_amount'] * 100) if goal['target_amount'] > 0 else 0
             
             updates = {
                 'current_amount': new_amount,
-                'progress': round(progress, 2)
+                'updated_at': datetime.now().isoformat()
             }
             
             # Mark as completed if target reached
             if new_amount >= goal['target_amount']:
                 updates['status'] = 'completed'
-                updates['completed_at'] = datetime.now().isoformat()
             
             return await self.update_goal(goal_id, updates)
             

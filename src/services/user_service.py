@@ -19,7 +19,7 @@ class UserService:
         """Create a new user profile"""
         try:
             # Encrypt sensitive data
-            salary = user_data.get('salary', 0)
+            salary = user_data.get('monthly_income', 0)
             encrypted_salary = self.encryption.encrypt_salary(salary) if salary > 0 else None
             
             data = {
@@ -27,7 +27,8 @@ class UserService:
                 'full_name': user_data.get('full_name'),
                 'age': user_data.get('age', 25),
                 'city': user_data.get('city', ''),
-                'salary': encrypted_salary,
+                'monthly_income': user_data.get('monthly_income', 0),
+                'salary_encrypted': encrypted_salary,
                 'risk_profile': user_data.get('risk_profile', 'moderate'),
                 'language': user_data.get('language', 'en'),
                 'currency': user_data.get('currency', 'INR'),
@@ -48,14 +49,14 @@ class UserService:
         try:
             result = self.db.table('user_profiles')\
                 .select('*')\
-                .eq('id', user_id)\
+                .eq('user_id', user_id)\
                 .execute()
             
             if result.data:
                 user = result.data[0]
                 # Decrypt salary
-                if user.get('salary'):
-                    user['salary'] = self.encryption.decrypt_salary(user['salary'])
+                if user.get('salary_encrypted'):
+                    user['monthly_income'] = self.encryption.decrypt_salary(user['salary_encrypted'])
                 return user
             return None
             
@@ -74,8 +75,8 @@ class UserService:
             if result.data:
                 user = result.data[0]
                 # Decrypt salary
-                if user.get('salary'):
-                    user['salary'] = self.encryption.decrypt_salary(user['salary'])
+                if user.get('salary_encrypted'):
+                    user['monthly_income'] = self.encryption.decrypt_salary(user['salary_encrypted'])
                 return user
             return None
             
@@ -87,14 +88,14 @@ class UserService:
         """Update user profile"""
         try:
             # Encrypt salary if being updated
-            if 'salary' in updates and updates['salary']:
-                updates['salary'] = self.encryption.encrypt_salary(updates['salary'])
+            if 'monthly_income' in updates and updates['monthly_income']:
+                updates['salary_encrypted'] = self.encryption.encrypt_salary(updates['monthly_income'])
             
             updates['updated_at'] = datetime.now().isoformat()
             
             result = self.db.table('user_profiles')\
                 .update(updates)\
-                .eq('id', user_id)\
+                .eq('user_id', user_id)\
                 .execute()
             
             logger.info("User updated", user_id=user_id)
@@ -102,8 +103,8 @@ class UserService:
             if result.data:
                 user = result.data[0]
                 # Decrypt salary for return
-                if user.get('salary'):
-                    user['salary'] = self.encryption.decrypt_salary(user['salary'])
+                if user.get('salary_encrypted'):
+                    user['monthly_income'] = self.encryption.decrypt_salary(user['salary_encrypted'])
                 return user
             return None
             
