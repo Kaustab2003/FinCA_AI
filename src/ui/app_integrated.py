@@ -21,8 +21,12 @@ from src.services.user_service import UserService
 # from src.utils.document_loader import IndianFinancialDocuments  # Moved to local import
 from src.utils.session_manager import SessionManager
 from src.services.auth_service import AuthService
+from src.ui.pages.features.portfolio_tracker import show_portfolio_tracker
+from src.ui.pages.features.gamification import show_gamification_hub
+from src.services.features_service import FeaturesService
 
 # Initialize logger
+# Force reload trigger
 logger.info("Starting FinCA AI application")
 
 # Page configuration
@@ -2184,6 +2188,21 @@ def main():
         st.markdown(f"👤 **{user_name}**")
         st.caption(f"Role: {user_role.capitalize() if user_role else 'Unknown'}")
         
+        # --- SIDEBAR NOTIFICATIONS ---
+        if st.session_state.get('authenticated', False):
+            user_id = st.session_state.get('user_id')
+            if user_id:
+                # Quick Notification Check
+                try:
+                    feat_service = FeaturesService()
+                    notifs = feat_service.get_notifications(user_id)
+                    if notifs:
+                        with st.expander(f"🔔 Notifications ({len(notifs)})"):
+                            for n in notifs:
+                                st.caption(f"• {n['message']}")
+                except:
+                    pass # Fail silently if table empty
+
         # Logout button
         if st.button("🚪 Logout", use_container_width=True):
             auth_service = AuthService()
@@ -2195,8 +2214,8 @@ def main():
         st.markdown("### 🎯 Navigation")
         
         # Navigation pages with admin dashboard for admins
-        pages = ["🏠 Dashboard", "💰 Budget", "🎯 Goals", "💬 Chat Assistant", 
-                 "📊 Tax Calculator", "📈 SIP Planner", "🏡 HRA Calculator", 
+        pages = ["🏠 Dashboard", "💰 Budget", "🎯 Goals", "📈 Portfolio", "🏆 Rewards & News",
+                 "💬 Chat Assistant", "📊 Tax Calculator", "📈 SIP Planner", "🏡 HRA Calculator", 
                  "💳 EMI Calculator", "💎 80C Comparator", "🏖️ Retirement Planner",
                  "📊 Expense Analytics", "👤 Profile",
                  "💰 Salary Breakup", "📱 Bill Reminder", "💳 Credit Card Optimizer",
@@ -2259,6 +2278,10 @@ def main():
         show_budget()
     elif page == "🎯 Goals":
         show_goals()
+    elif page == "📈 Portfolio":
+        show_portfolio_tracker()
+    elif page == "🏆 Rewards & News":
+        show_gamification_hub()
     elif page == "💬 Chat Assistant":
         show_chat()
     elif page == "📊 Tax Calculator":

@@ -199,3 +199,15 @@ class AuthService:
     def verify_session(self) -> bool:
         """Verify if session is valid (always true for custom auth)"""
         return True
+    
+    def get_user_profile(self, email: str) -> Optional[Dict]:
+        """Get user profile by email"""
+        try:
+            email = email.lower().strip()
+            result = self.db.table('user_profiles').select('*').eq('email', email).execute()
+            if result.data:
+                return result.data[0]
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching user profile: {str(e)}")
+            return None
