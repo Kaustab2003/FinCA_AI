@@ -32,7 +32,6 @@ class FinancialKnowledgeAgent:
         # Embeddings for vector database (using free HuggingFace model)
         self.embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2",  # Fast, lightweight, free
-            model_kwargs={'device': 'cpu'},  # Use CPU (faster on Windows)
             encode_kwargs={'normalize_embeddings': True}  # Better similarity search
         )
         
