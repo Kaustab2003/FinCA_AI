@@ -3188,20 +3188,41 @@ def show_dashboard():
     
     st.header("🏠 Dashboard")
     
+    # Force data refresh if requested
+    if st.button("🔄 Refresh Data", help="Reload all dashboard data from database"):
+        # Clear any cached data
+        for key in list(st.session_state.keys()):
+            if key.startswith(('dashboard_', 'cached_')):
+                del st.session_state[key]
+        st.rerun()
+    
     # Get real data from database
     from src.config.database import DatabaseClient
     db = DatabaseClient.get_client()
     user_id = st.session_state.user_id
     
+    # Validate user_id
+    if not user_id:
+        st.error("❌ User session expired. Please log in again.")
+        return
+    
     # Fetch user's budget data
     budgets_result = db.table('budgets').select('*').eq('user_id', user_id).execute()
     goals_result = db.table('goals').select('*').eq('user_id', user_id).execute()
-    transactions_result = db.table('transactions').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(10).execute()
+    
+    # Fetch transactions with better error handling
+    try:
+        transactions_result = db.table('transactions').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(50).execute()
+        transactions_data = transactions_result.data if transactions_result.data else []
+    except Exception as e:
+        st.error(f"Error loading transactions: {str(e)}")
+        transactions_data = []
+        transactions_result = type('MockResult', (), {'data': []})()
     
     # Check if user has any data
     has_budget = bool(budgets_result.data)
     has_goals = bool(goals_result.data)
-    has_transactions = bool(transactions_result.data)
+    has_transactions = bool(transactions_data)
     
     # Debug information (remove in production)
     if st.sidebar.checkbox("🔍 Show Debug Info", value=False):
@@ -3209,7 +3230,17 @@ def show_dashboard():
         st.sidebar.write(f"User ID: {user_id}")
         st.sidebar.write(f"Has Budget: {has_budget} ({len(budgets_result.data) if budgets_result.data else 0} items)")
         st.sidebar.write(f"Has Goals: {has_goals} ({len(goals_result.data) if goals_result.data else 0} items)")
-        st.sidebar.write(f"Has Transactions: {has_transactions} ({len(transactions_result.data) if transactions_result.data else 0} items)")
+        st.sidebar.write(f"Has Transactions: {has_transactions} ({len(transactions_data) if transactions_data else 0} items)")
+        
+        # Show recent transactions
+        if transactions_data:
+            st.sidebar.write("**Recent Transactions:**")
+            for i, txn in enumerate(transactions_data[:5]):
+                st.sidebar.write(f"{i+1}. {txn.get('description', 'N/A')} - ₹{txn.get('amount', 0)} ({txn.get('source', 'N/A')})")
+        
+        # Add refresh button
+        if st.sidebar.button("🔄 Refresh Dashboard Data"):
+            st.rerun()
     
     # Welcome back section for users with data
     if has_budget or has_goals or has_transactions:
@@ -3230,7 +3261,7 @@ def show_dashboard():
         # Count user's data
         budget_count = len(budgets_result.data) if has_budget else 0
         goals_count = len(goals_result.data) if has_goals else 0
-        transactions_count = len(transactions_result.data) if has_transactions else 0
+        transactions_count = len(transactions_data) if has_transactions else 0
         
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; padding: 20px; margin-bottom: 20px; color: white;">

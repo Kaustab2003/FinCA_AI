@@ -218,15 +218,100 @@ def display_parsed_results(result: dict, user_id: str):
                 if st.button(f"Create Goal", key=f"goal_{suggestion['title']}"):
                     create_goal_from_suggestion(suggestion, user_id)
 
+    # Processing Summary Section
+    st.markdown("---")
+    st.subheader("📋 Processing Summary")
+
+    col1, col2, col3 = st.columns([2, 2, 2])
+
+    with col1:
+        st.metric("Confidence Score", f"{result.get('confidence', 0):.1%}")
+        st.caption("AI confidence in extracted data")
+
+    with col2:
+        transactions_count = len(result.get('parsed_data', {}).get('transactions', []))
+        st.metric("Transactions Found", transactions_count)
+        st.caption("Total transactions extracted")
+
+    with col3:
+        st.metric("Processing Time", "< 30 seconds")
+        st.caption("Typical processing time")
+
+    # Helpful Tips Section
+    st.markdown("---")
+    st.subheader("💡 Helpful Tips")
+
+    tips_col1, tips_col2 = st.columns(2)
+
+    with tips_col1:
+        st.markdown("""
+        **📄 Supported Formats:**
+        - PDF bank statements
+        - CSV transaction files
+        - Clear text documents
+        - Scanned images (OCR)
+
+        **🔍 Best Results:**
+        - Use high-quality scans
+        - Ensure text is readable
+        - Include date ranges
+        """)
+
+    with tips_col2:
+        st.markdown("""
+        **⚙️ Troubleshooting:**
+        - Low confidence? Try different file
+        - Missing transactions? Check file format
+        - Import errors? Verify data format
+
+        **📞 Support:**
+        - Check import results
+        - Use debug mode in dashboard
+        - Contact support if issues persist
+        """)
+
+    # Support Information
+    st.markdown("---")
+    st.subheader("📞 Support & Resources")
+
+    st.markdown("""
+    **Need Help?**
+    - 📧 Contact: support@fincai.com
+    - 📚 Docs: Check our documentation
+    - 🐛 Report Issues: Use the feedback form
+
+    **🔄 Data Persistence:**
+    - Transactions are saved to database
+    - Available across all sessions
+    - Backup recommended for important data
+    """)
+
 def import_transactions_bulk(transactions: list, user_id: str):
-    """Import multiple transactions from parsed data"""
+    """Import multiple transactions from parsed data with improved error handling"""
+    if not user_id:
+        st.error("❌ User ID not found. Please log in again.")
+        return
+
+    if not transactions:
+        st.warning("⚠️ No transactions to import.")
+        return
+
     transaction_service = TransactionService()
 
     success_count = 0
     error_messages = []
+    imported_ids = []
 
-    for txn in transactions:
+    # Show progress
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    total_transactions = len(transactions)
+
+    for i, txn in enumerate(transactions):
         try:
+            status_text.text(f"Importing transaction {i+1}/{total_transactions}: {txn.get('description', 'Unknown')}")
+
             # Clean and format the amount (remove ₹ symbol and formatting)
             amount_str = str(txn.get('amount', '0')).replace('₹', '').replace(',', '').strip()
             try:
@@ -266,26 +351,92 @@ def import_transactions_bulk(transactions: list, user_id: str):
                 'source': 'document_parser'
             }
 
-            # Run async function in sync context
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            result = loop.run_until_complete(
-                transaction_service.create_transaction(user_id, txn_data)
-            )
-            loop.close()
+            # Validate data before saving
+            if amount <= 0:
+                error_messages.append(f"Invalid amount for: {txn.get('description', 'Unknown')}")
+                continue
 
-            success_count += 1
+            # Use asyncio for async call
+            import asyncio
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(
+                    transaction_service.create_transaction(user_id, txn_data)
+                )
+                loop.close()
+
+                if result and result.get('success'):
+                    success_count += 1
+                    imported_ids.append(result.get('transaction_id'))
+                else:
+                    error_messages.append(f"Failed to save: {txn.get('description', 'Unknown')}")
+
+            except Exception as e:
+                error_messages.append(f"Async error for {txn.get('description', 'Unknown')}: {str(e)}")
+                # Try fallback sync method if available
+                try:
+                    # Fallback: try to save directly to database
+                    db = transaction_service.db
+                    transaction_record = {
+                        'user_id': user_id,
+                        'date': formatted_date,
+                        'amount': amount,
+                        'type': txn_type,
+                        'category': txn.get('category', categorize_transaction(txn.get('description', ''))),
+                        'description': txn.get('description', ''),
+                        'source': 'document_parser'
+                    }
+
+                    result = db.table('transactions').insert(transaction_record).execute()
+                    if result.data:
+                        success_count += 1
+                        imported_ids.append(result.data[0]['id'])
+                    else:
+                        error_messages.append(f"Fallback failed for: {txn.get('description', 'Unknown')}")
+                except Exception as fallback_e:
+                    error_messages.append(f"Fallback error for {txn.get('description', 'Unknown')}: {str(fallback_e)}")
 
         except Exception as e:
-            error_messages.append(f"Failed to import: {txn.get('description', 'Unknown')} - {str(e)}")
+            error_messages.append(f"General error for {txn.get('description', 'Unknown')}: {str(e)}")
 
+        # Update progress
+        progress_bar.progress((i + 1) / total_transactions)
+
+    # Clear progress indicators
+    progress_bar.empty()
+    status_text.empty()
+
+    # Show results
     if success_count > 0:
         st.success(f"✅ Successfully imported {success_count} transactions!")
+
+        # Force refresh of dashboard data by clearing any cached data
+        if 'dashboard_data' in st.session_state:
+            del st.session_state.dashboard_data
+
+        # Show imported transaction IDs for verification
+        with st.expander("📋 Imported Transactions"):
+            st.write("Transaction IDs:")
+            for txn_id in imported_ids:
+                st.code(txn_id, language=None)
 
     if error_messages:
         with st.expander("⚠️ Import Errors"):
             for error in error_messages:
                 st.error(error)
+
+    # Add verification section
+    if success_count > 0:
+        st.info("💡 **Verification**: Check your Dashboard to see the imported transactions. If they don't appear after logout/login, there might be a session issue.")
+        
+        # Show current database status
+        try:
+            db = transaction_service.db
+            current_transactions = db.table('transactions').select('*').eq('user_id', user_id).execute()
+            st.success(f"📊 Database Status: {len(current_transactions.data) if current_transactions.data else 0} total transactions in database")
+        except Exception as db_e:
+            st.warning(f"Could not verify database status: {str(db_e)}")
 
 def categorize_transaction(description: str) -> str:
     """Categorize transaction based on description"""
