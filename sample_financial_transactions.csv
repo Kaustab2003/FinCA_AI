@@ -1,0 +1,28 @@
+Date,Description,Amount,Category,Type,Source
+2025-11-27,Groceries at Big Bazaar,2500.00,Food & Dining,expense,manual
+2025-11-26,Salary Credit - ABC Corp,75000.00,Income,income,salary
+2025-11-25,Electricity Bill Payment,3200.00,Bills & Utilities,expense,bill
+2025-11-24,Movie Tickets - PVR,800.00,Entertainment,expense,card
+2025-11-23,Petrol - Indian Oil,1500.00,Transportation,expense,fuel
+2025-11-22,Gym Membership - Gold's Gym,2999.00,Healthcare,expense,subscription
+2025-11-21,Online Shopping - Amazon,4500.00,Shopping,expense,online
+2025-11-20,Mobile Recharge - Airtel,599.00,Bills & Utilities,expense,recharge
+2025-11-19,Dining at The Leela,3500.00,Food & Dining,expense,restaurant
+2025-11-18,Medical Checkup,2500.00,Healthcare,expense,clinic
+2025-11-17,Book Purchase - Crossword,1200.00,Education,expense,store
+2025-11-16,Auto Rickshaw,150.00,Transportation,expense,local
+2025-11-15,Netflix Subscription,499.00,Entertainment,expense,subscription
+2025-11-14,Gas Cylinder,950.00,Bills & Utilities,expense,delivery
+2025-11-13,Coffee at CCD,250.00,Food & Dining,expense,cafe
+2025-11-12,ATM Withdrawal,5000.00,Cash Withdrawal,expense,atm
+2025-11-11,Freelance Payment,15000.00,Income,income,freelance
+2025-11-10,Medicine Purchase,800.00,Healthcare,expense,pharmacy
+2025-11-09,Bus Ticket - RedBus,450.00,Transportation,expense,online
+2025-11-08,Shopping - Pantaloons,3200.00,Shopping,expense,store
+2025-11-07,Water Bill Payment,1200.00,Bills & Utilities,expense,bill
+2025-11-06,DTH Recharge,399.00,Entertainment,expense,recharge
+2025-11-05,Grocery Delivery - BigBasket,1800.00,Food & Dining,expense,online
+2025-11-04,Taxi to Airport,650.00,Transportation,expense,taxi
+2025-11-03,Investment - SIP HDFC,5000.00,Investments,expense,sip
+2025-11-02,Donation - Temple,1100.00,Personal,expense,donation
+2025-11-01,Rent Payment,25000.00,Housing,expense,rent

@@ -5,6 +5,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 from src.config.database import DatabaseClient
 from src.agents.supervisor import SupervisorAgent
+from src.agents.conversational_data_entry_agent import ConversationalDataEntryAgent
 from src.services.vector_service import VectorService
 from src.utils.logger import logger
 
@@ -16,12 +17,34 @@ class ChatService:
         self.db = DatabaseClient.get_client()
         self.supervisor = SupervisorAgent()
         self.vector_service = VectorService()
+        self.data_entry_agent = ConversationalDataEntryAgent()
     
     async def process_message(self, user_id: str, message: str, user_context: Dict[str, Any]) -> Dict[str, Any]:
         """Process a chat message and get AI response"""
         try:
             # Save user message to chat history
             await self.save_message(user_id, 'user', message)
+            
+            # Check if this is a data entry request
+            if self._is_data_entry_intent(message):
+                # Process as data entry
+                response = await self.data_entry_agent.process(message, {'user_id': user_id, **user_context})
+                
+                # Save assistant response to chat history
+                await self.save_message(user_id, 'assistant', response['content'], {
+                    'agent_type': response['agent_type'],
+                    'confidence': response['confidence'],
+                    'data_created': response.get('data_created', False),
+                    'data_type': response.get('data_type'),
+                    'data_id': response.get('data_id')
+                })
+                
+                logger.info("Data entry processed", 
+                           user_id=user_id,
+                           data_created=response.get('data_created', False),
+                           data_type=response.get('data_type'))
+                
+                return response
             
             # Get user-specific relevant context from vector store
             user_vectors = await self.vector_service.retrieve_user_context(user_id, message, top_k=5)
@@ -65,6 +88,42 @@ class ChatService:
                 'confidence': 0.0,
                 'error': str(e)
             }
+    
+    def _is_data_entry_intent(self, message: str) -> bool:
+        """Check if the message appears to be a data entry request"""
+        message_lower = message.lower().strip()
+        
+        # Keywords that indicate data entry
+        data_entry_keywords = [
+            # Transaction keywords
+            'spent', 'bought', 'paid', 'received', 'earned', 'income', 'expense',
+            'transaction', 'purchase', 'payment', 'deposit', 'withdrawal',
+            
+            # Budget keywords
+            'budget', 'monthly income', 'monthly expenses', 'plan to spend',
+            
+            # Goal keywords
+            'goal', 'save for', 'want to buy', 'target', 'aim to',
+            
+            # Action verbs
+            'add', 'create', 'record', 'track', 'log', 'enter',
+            
+            # Money amounts with context
+            '₹', '$', 'rs', 'rupees', 'dollars'
+        ]
+        
+        # Check for keywords
+        has_keywords = any(keyword in message_lower for keyword in data_entry_keywords)
+        
+        # Check for money amounts (digits followed by currency or just digits)
+        import re
+        has_amount = bool(re.search(r'\d+(\.\d{2})?', message))
+        
+        # Check for dates
+        has_date = bool(re.search(r'\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\b', message_lower))
+        
+        # Must have either keywords OR (amount AND likely financial context)
+        return has_keywords or (has_amount and len(message.split()) < 20)  # Short messages with amounts are likely data entry
     
     async def save_message(self, user_id: str, role: str, content: str, metadata: Dict[str, Any] = None):
         """Save a message to chat history"""

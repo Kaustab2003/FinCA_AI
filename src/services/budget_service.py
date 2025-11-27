@@ -16,7 +16,7 @@ class BudgetService:
         self.vector_service = VectorService()
     
     async def create_budget(self, user_id: str, budget_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new budget entry"""
+        """Create or update a budget entry"""
         try:
             data = {
                 'user_id': user_id,
@@ -32,7 +32,19 @@ class BudgetService:
                 'notes': budget_data.get('notes', '')
             }
             
-            result = self.db.table('budgets').insert(data).execute()
+            # Check if budget already exists for this user and month
+            existing_budget = await self.get_budget(user_id, data['month'])
+            
+            if existing_budget:
+                # Update existing budget
+                budget_id = existing_budget['id']
+                result = self.db.table('budgets').update(data).eq('id', budget_id).execute()
+                logger.info("Budget updated", user_id=user_id, month=data['month'], budget_id=budget_id)
+            else:
+                # Create new budget
+                result = self.db.table('budgets').insert(data).execute()
+                budget_id = result.data[0]['id'] if result.data else None
+                logger.info("Budget created", user_id=user_id, month=data['month'], budget_id=budget_id)
             
             # Embed budget data for personalized AI
             budget_content = f"""
@@ -53,11 +65,10 @@ class BudgetService:
                     'income': data['income'],
                     'savings': data['savings'],
                     'savings_rate': data['savings']/data['income'] if data['income'] > 0 else 0,
-                    'budget_id': result.data[0]['id'] if result.data else None
+                    'budget_id': budget_id
                 }
             )
             
-            logger.info("Budget created and embedded", user_id=user_id, month=data['month'])
             return result.data[0] if result.data else None
             
         except Exception as e:
@@ -82,21 +93,21 @@ class BudgetService:
             logger.error("Budget fetch failed", error=str(e), user_id=user_id)
             return None
     
-    async def get_all_budgets(self, user_id: str, limit: int = 12) -> List[Dict[str, Any]]:
-        """Get all budgets for a user"""
+    async def get_latest_budget(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get the most recent budget for a user"""
         try:
             result = self.db.table('budgets')\
                 .select('*')\
                 .eq('user_id', user_id)\
                 .order('month', desc=True)\
-                .limit(limit)\
+                .limit(1)\
                 .execute()
             
-            return result.data if result.data else []
+            return result.data[0] if result.data else None
             
         except Exception as e:
-            logger.error("Budgets fetch failed", error=str(e), user_id=user_id)
-            return []
+            logger.error("Latest budget fetch failed", error=str(e), user_id=user_id)
+            return None
     
     async def update_budget(self, budget_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         """Update an existing budget"""

@@ -242,13 +242,16 @@ class MetricsCalculator:
             behavioral_score * cls.WEIGHTS['behavioral']
         )
         
+        # Ensure total score is between 0-100
+        total_score = max(0, min(100, total_score))
+        
         # Component breakdown
         components = {
-            'savings_rate_score': savings_rate_score,
-            'emergency_fund_score': emergency_fund_score,
-            'goal_progress_score': goal_progress_score,
-            'debt_health_score': debt_health_score,
-            'behavioral_score': behavioral_score
+            'savings_rate_score': max(0, min(100, savings_rate_score)),
+            'emergency_fund_score': max(0, min(100, emergency_fund_score)),
+            'goal_progress_score': max(0, min(100, goal_progress_score)),
+            'debt_health_score': max(0, min(100, debt_health_score)),
+            'behavioral_score': max(0, min(100, behavioral_score))
         }
         
         logger.info(

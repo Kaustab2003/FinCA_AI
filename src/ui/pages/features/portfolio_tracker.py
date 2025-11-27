@@ -87,6 +87,9 @@ def show_portfolio_tracker():
                     success, msg = service.add_portfolio_transaction(user_id, data)
                     if success:
                         st.success(msg)
+                        # Set flag to indicate portfolio data has been updated
+                        st.session_state.portfolio_data_updated = True
+                        st.session_state.portfolio_last_updated = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
                         st.rerun()
                     else:
                         st.error(f"Failed to add transaction: {msg}")

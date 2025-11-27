@@ -32,6 +32,8 @@ sentence-transformers
 # Document Processing for RAG
 pypdf
 unstructured
+Pillow
+pytesseract
 
 # Monitoring & Logging
 langsmith

@@ -194,6 +194,33 @@ class SessionManager:
         return True
     
     @staticmethod
+    def get_budget_data() -> Optional[Dict]:
+        """
+        Get current user's latest budget data from database
+        
+        Returns:
+            Budget data dictionary or None if no budget exists
+        """
+        try:
+            from src.services.budget_service import BudgetService
+            import asyncio
+            
+            user_id = SessionManager.get_user_id()
+            if not user_id:
+                return None
+            
+            budget_service = BudgetService()
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            budget = loop.run_until_complete(budget_service.get_latest_budget(user_id))
+            
+            return budget
+            
+        except Exception as e:
+            logger.error(f"Failed to get budget data: {str(e)}")
+            return None
+    
+    @staticmethod
     def get_session_info() -> Dict:
         """
         Get comprehensive session information for debugging

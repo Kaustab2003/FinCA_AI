@@ -2,7 +2,7 @@
 AI Client Wrapper - Supports OpenAI, DeepSeek, and Groq
 """
 from typing import Optional, List, Dict, Any
-from openai import OpenAI
+from openai import AsyncOpenAI
 from src.config.settings import settings
 from src.utils.logger import logger
 
@@ -29,7 +29,7 @@ class AIClient:
     def _init_groq(self):
         """Initialize Groq client (FREE & FAST)"""
         try:
-            self.client = OpenAI(
+            self.client = AsyncOpenAI(
                 api_key=settings.GROQ_API_KEY,
                 base_url="https://api.groq.com/openai/v1"
             )
@@ -43,7 +43,7 @@ class AIClient:
     def _init_deepseek(self):
         """Initialize DeepSeek client (FREE)"""
         try:
-            self.client = OpenAI(
+            self.client = AsyncOpenAI(
                 api_key=settings.DEEPSEEK_API_KEY,
                 base_url="https://api.deepseek.com"
             )
@@ -56,7 +56,7 @@ class AIClient:
     def _init_openai(self):
         """Initialize OpenAI client (PAID)"""
         try:
-            self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+            self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
             self.model = "gpt-4o-mini"
             logger.info("✅ OpenAI initialized successfully")
         except Exception as e:
@@ -75,7 +75,7 @@ class AIClient:
             self.provider = "fallback"
             logger.warning("All AI providers failed, using fallback mode")
     
-    def chat_completion(
+    async def chat_completion(
         self, 
         messages: List[Dict[str, str]], 
         temperature: float = 0.5,
@@ -86,7 +86,7 @@ class AIClient:
             raise Exception("No AI provider available")
         
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 temperature=temperature,
@@ -96,6 +96,17 @@ class AIClient:
         except Exception as e:
             logger.error(f"Chat completion failed: {e}")
             raise
+    
+    async def generate_response(
+        self, 
+        prompt: str, 
+        model: str = None,
+        temperature: float = 0.5,
+        max_tokens: int = 1200
+    ) -> str:
+        """Generate response from prompt (convenience method)"""
+        messages = [{"role": "user", "content": prompt}]
+        return await self.chat_completion(messages, temperature, max_tokens)
     
     def is_available(self) -> bool:
         """Check if AI provider is available"""

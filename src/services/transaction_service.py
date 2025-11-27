@@ -158,6 +158,41 @@ class TransactionService:
             logger.error("Transaction summary failed", error=str(e), user_id=user_id)
             return {}
 
+    async def categorize_expense(self, user_id: str, description: str) -> Dict[str, Any]:
+        """Auto-categorize an expense using LLM"""
+        try:
+            from src.agents.expense_categorization_agent import ExpenseCategorizationAgent
+
+            agent = ExpenseCategorizationAgent()
+            result = await agent.process(description, {'user_id': user_id})
+
+            return {
+                'category': result.metadata.get('category', 'Other'),
+                'subcategory': result.metadata.get('subcategory', ''),
+                'confidence': result.confidence,
+                'reasoning': result.metadata.get('reasoning', ''),
+                'agent_response': result
+            }
+
+        except Exception as e:
+            logger.error("Expense categorization failed", error=str(e), user_id=user_id)
+            return {
+                'category': 'Other',
+                'subcategory': '',
+                'confidence': 0.0,
+                'reasoning': 'Categorization service unavailable',
+                'error': str(e)
+            }
+
+    def categorize_expense_sync(self, user_id: str, description: str) -> Dict[str, Any]:
+        """Synchronous version of expense categorization"""
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(self.categorize_expense(user_id, description))
+        loop.close()
+        return result
+
     async def _embed_transaction_data(self, user_id: str, transaction_data: Dict[str, Any], transaction_id: int) -> None:
         """Embed transaction data for personalized LLM context"""
         try:

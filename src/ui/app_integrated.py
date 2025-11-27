@@ -178,6 +178,31 @@ def show_hra_calculator():
         bracket_rate = float(tax_bracket.strip('%')) / 100
         actual_tax_saved = hra_exempt * bracket_rate
         st.info(f"🎉 You save **₹{actual_tax_saved:,.0f}** in taxes with this HRA exemption!")
+        
+        # AI Explanation Button
+        if st.button("🤖 Explain This HRA Calculation", type="secondary"):
+            try:
+                from src.agents.calculation_explanation_agent import CalculationExplanationAgent
+                explanation_agent = CalculationExplanationAgent()
+                
+                # Prepare context for explanation
+                hra_context = {
+                    'basic_salary': basic_salary,
+                    'hra_received': hra_received,
+                    'rent_paid': rent_paid,
+                    'metro_city': metro_city,
+                    'hra_exempt': hra_exempt,
+                    'taxable_hra': taxable_hra,
+                    'tax_bracket': tax_bracket,
+                    'actual_tax_saved': actual_tax_saved
+                }
+                
+                with st.spinner("🤖 Analyzing your HRA calculation..."):
+                    explanation = explanation_agent.explain_hra_calculation(hra_context)
+                    st.info("### 🤖 AI Explanation:")
+                    st.write(explanation)
+            except Exception as e:
+                st.error(f"❌ Could not generate explanation: {str(e)}")
 
 def show_emi_calculator():
     """EMI Calculator with comparison and prepayment analysis"""
@@ -231,6 +256,29 @@ def show_emi_calculator():
             st.plotly_chart(fig, use_container_width=True)
             
             st.info(f"💡 **Insight**: You'll pay ₹{total_interest:,.0f} ({(total_interest/loan_amount)*100:.1f}% of principal) as interest over {tenure_years} years")
+            
+            # AI Explanation Button
+            if st.button("🤖 Explain This Calculation", type="secondary"):
+                try:
+                    from src.agents.calculation_explanation_agent import CalculationExplanationAgent
+                    explanation_agent = CalculationExplanationAgent()
+                    
+                    # Prepare context for explanation
+                    emi_context = {
+                        'loan_amount': loan_amount,
+                        'interest_rate': interest_rate,
+                        'tenure_years': tenure_years,
+                        'monthly_emi': emi,
+                        'total_payment': total_payment,
+                        'total_interest': total_interest
+                    }
+                    
+                    with st.spinner("🤖 Analyzing your EMI calculation..."):
+                        explanation = explanation_agent.explain_loan_calculation(emi_context)
+                        st.info("### 🤖 AI Explanation:")
+                        st.write(explanation)
+                except Exception as e:
+                    st.error(f"❌ Could not generate explanation: {str(e)}")
     
     with tab2:
         st.subheader("Compare Multiple Loan Options")
@@ -487,6 +535,27 @@ def show_80c_comparator():
         st.warning("⚠️ Note: ELSS has highest returns but comes with market risk. Diversify across multiple options.")
     
     st.info("💡 **Pro Tip**: Diversify your ₹1.5L across PPF (safety) + ELSS (growth) + NPS (retirement) for optimal tax-saving!")
+    
+    # AI Explanation Button
+    if st.button("🤖 Explain This Comparison", type="secondary"):
+        try:
+            from src.agents.calculation_explanation_agent import CalculationExplanationAgent
+            explanation_agent = CalculationExplanationAgent()
+            
+            # Prepare context for explanation
+            c80_context = {
+                'investment_amount': investment_amount,
+                'time_horizon': time_horizon,
+                'results': results,
+                'best_option': best
+            }
+            
+            with st.spinner("🤖 Analyzing your 80C investment comparison..."):
+                explanation = explanation_agent.explain_80c_comparison(c80_context)
+                st.info("### 🤖 AI Explanation:")
+                st.write(explanation)
+        except Exception as e:
+            st.error(f"❌ Could not generate explanation: {str(e)}")
 
 def show_retirement_planner():
     """Retirement Planning Calculator with inflation"""
@@ -627,6 +696,34 @@ def show_retirement_planner():
             st.success(f"✅ **Achievable Goal**: Required SIP is only {(monthly_sip/current_expenses)*100:.0f}% of current expenses. You're on track!")
         
         st.info(f"🎯 **Action Plan**: Start SIP of ₹{monthly_sip:,.0f}/month in diversified equity funds. Increase by 10% every year to beat inflation!")
+        
+        # AI Explanation Button
+        if st.button("🤖 Explain This Calculation", type="secondary"):
+            try:
+                from src.agents.calculation_explanation_agent import CalculationExplanationAgent
+                explanation_agent = CalculationExplanationAgent()
+                
+                # Prepare context for explanation
+                retirement_context = {
+                    'current_age': current_age,
+                    'retirement_age': retirement_age,
+                    'life_expectancy': life_expectancy,
+                    'current_expenses': current_expenses,
+                    'inflation_rate': inflation_rate,
+                    'expected_return': expected_return,
+                    'corpus_needed': corpus_needed,
+                    'monthly_sip': monthly_sip,
+                    'years_to_retirement': years_to_retirement,
+                    'years_in_retirement': years_in_retirement,
+                    'expenses_at_retirement': expenses_at_retirement
+                }
+                
+                with st.spinner("🤖 Analyzing your retirement calculation..."):
+                    explanation = explanation_agent.explain_retirement_calculation(retirement_context)
+                    st.info("### 🤖 AI Explanation:")
+                    st.write(explanation)
+            except Exception as e:
+                st.error(f"❌ Could not generate explanation: {str(e)}")
 
 def show_expense_analytics():
     """Expense Analytics with AI insights - Using REAL data from Budget"""
@@ -659,6 +756,37 @@ def show_expense_analytics():
             
             expense_description = st.text_input("Description (Optional)", placeholder="e.g., Groceries at Big Bazaar")
             
+            # AI Category Suggestion
+            if expense_description.strip():
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    if st.form_submit_button("🤖 Auto-Categorize", use_container_width=True):
+                        from src.agents.expense_categorization_agent import ExpenseCategorizationAgent
+                        agent = ExpenseCategorizationAgent()
+                        
+                        # Run categorization in a new event loop
+                        import asyncio
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        result = loop.run_until_complete(agent.process(expense_description, {}))
+                        loop.close()
+                        
+                        if result.confidence > 0.5:
+                            suggested_category = result.metadata.get('category', 'Others')
+                            st.success(f"🤖 **Suggested Category:** {suggested_category} (Confidence: {result.confidence:.1%})")
+                            st.info(f"💡 **Reasoning:** {result.metadata.get('reasoning', '')}")
+                            
+                            # Update the category selectbox (this will show in next rerun)
+                            st.session_state.suggested_category = suggested_category
+                        else:
+                            st.warning("🤖 **Low confidence suggestion** - please verify the category manually")
+                
+                with col2:
+                    if st.checkbox("Use AI Suggestion", value=False, key="use_ai_category"):
+                        if st.session_state.get('suggested_category'):
+                            expense_category = st.session_state.suggested_category
+                            st.info(f"✅ Using AI-suggested category: **{expense_category}**")
+            
             if st.form_submit_button("💾 Add Expense"):
                 if expense_amount > 0:
                     new_expense = {
@@ -668,7 +796,28 @@ def show_expense_analytics():
                         'description': expense_description or f"{expense_category} expense"
                     }
                     st.session_state.expense_history.append(new_expense)
-                    st.success(f"✅ Added ₹{expense_amount:,.0f} to {expense_category}")
+                    
+                    # Also save to database transactions table
+                    from src.config.database import DatabaseClient
+                    db = DatabaseClient.get_client()
+                    user_id = st.session_state.user_id
+                    
+                    transaction_data = {
+                        'user_id': user_id,
+                        'date': expense_date.strftime('%Y-%m-%d'),
+                        'amount': expense_amount,
+                        'type': 'expense',
+                        'category': expense_category,
+                        'description': expense_description or f"{expense_category} expense",
+                        'source': 'manual'
+                    }
+                    
+                    try:
+                        db.table('transactions').insert(transaction_data).execute()
+                        st.success(f"✅ Added ₹{expense_amount:,.0f} to {expense_category}")
+                    except Exception as e:
+                        st.error(f"⚠️ Expense added to session but failed to save to database: {str(e)}")
+                    
                     st.rerun()
                 else:
                     st.error("⚠️ Please enter a valid amount")
@@ -898,6 +1047,81 @@ def show_expense_analytics():
             st.warning(alert)
     else:
         st.success("✅ No spending alerts - you're doing great!")
+    
+    # AI Expense Categorization Section
+    st.markdown("---")
+    st.subheader("🤖 AI Expense Categorization")
+    
+    # Find expenses that might need better categorization
+    uncategorized_expenses = []
+    for expense in current_month_data.to_dict('records'):
+        if expense['category'] in ['Others', 'Other'] or len(expense['description'].split()) < 3:
+            uncategorized_expenses.append(expense)
+    
+    if uncategorized_expenses:
+        st.info(f"📝 Found {len(uncategorized_expenses)} expenses that could benefit from AI categorization")
+        
+        with st.expander("🔄 Recategorize Expenses with AI", expanded=False):
+            selected_expenses = st.multiselect(
+                "Select expenses to recategorize:",
+                options=[f"{e['description']} (₹{e['amount']:,.0f})" for e in uncategorized_expenses],
+                help="Choose expenses with vague descriptions for AI categorization"
+            )
+            
+            if st.button("🤖 Categorize Selected Expenses", disabled=len(selected_expenses) == 0):
+                from src.agents.expense_categorization_agent import ExpenseCategorizationAgent
+                agent = ExpenseCategorizationAgent()
+                
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                for i, expense_desc in enumerate(selected_expenses):
+                    # Extract description from the formatted string
+                    description = expense_desc.split(' (₹')[0]
+                    
+                    status_text.text(f"🤖 Categorizing: {description}")
+                    
+                    # Run categorization
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    result = loop.run_until_complete(agent.process(description, {}))
+                    loop.close()
+                    
+                    if result.confidence > 0.3:  # Lower threshold for bulk categorization
+                        suggested_category = result.metadata.get('category', 'Others')
+                        
+                        # Update the expense in session state
+                        for expense in st.session_state.expense_history:
+                            if expense['description'] == description:
+                                expense['category'] = suggested_category
+                                break
+                        
+                        # Update in database if it exists there
+                        try:
+                            from src.config.database import DatabaseClient
+                            db = DatabaseClient.get_client()
+                            user_id = st.session_state.user_id
+                            
+                            # Find and update the transaction
+                            db.table('transactions').update({
+                                'category': suggested_category
+                            }).eq('user_id', user_id).eq('description', description).execute()
+                            
+                            st.success(f"✅ **{description}** → **{suggested_category}** (Confidence: {result.confidence:.1%})")
+                        except Exception as e:
+                            st.warning(f"⚠️ Updated locally but failed to save to database: {description} → {suggested_category}")
+                    else:
+                        st.warning(f"🤖 Low confidence for: {description} - kept original category")
+                    
+                    progress_bar.progress((i + 1) / len(selected_expenses))
+                
+                status_text.empty()
+                progress_bar.empty()
+                st.success("🎉 AI categorization complete!")
+                st.rerun()
+    else:
+        st.success("✅ All expenses appear to be well-categorized!")
     
     # Detailed transaction breakdown
     st.markdown("---")
@@ -1143,19 +1367,65 @@ def show_goals():
     # Add new goal form
     st.markdown("---")
     with st.expander("➕ Create New Financial Goal", expanded=len(goals) == 0):
+        # Show budget integration info
+        budget_data = SessionManager.get_budget_data()
+        if budget_data:
+            st.info(f"💡 **Budget Integration Active!** Your monthly income: ₹{budget_data.get('income', 0):,.0f} | Savings: ₹{budget_data.get('savings', 0):,.0f}")
+            
+            # Smart goal suggestions based on budget
+            monthly_income = budget_data.get('income', 0)
+            monthly_savings = budget_data.get('savings', 0)
+            
+            if monthly_income > 0:
+                st.markdown("#### 🎯 Smart Goal Suggestions Based on Your Budget:")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    emergency_suggestion = monthly_expenses * 6 if 'monthly_expenses' in locals() else monthly_income * 0.1 * 6
+                    if st.button(f"🚨 Emergency Fund (₹{emergency_suggestion:,.0f})"):
+                        st.session_state.suggested_goal = {
+                            'name': 'Emergency Fund',
+                            'amount': emergency_suggestion,
+                            'category': 'emergency_fund'
+                        }
+                
+                with col2:
+                    investment_suggestion = monthly_savings * 12 if monthly_savings > 0 else monthly_income * 0.2 * 12
+                    if st.button(f"📈 Investment Fund (₹{investment_suggestion:,.0f})"):
+                        st.session_state.suggested_goal = {
+                            'name': 'Investment Fund',
+                            'amount': investment_suggestion,
+                            'category': 'investment'
+                        }
+                
+                with col3:
+                    vacation_suggestion = monthly_income * 0.15 * 12
+                    if st.button(f"🏖️ Vacation Fund (₹{vacation_suggestion:,.0f})"):
+                        st.session_state.suggested_goal = {
+                            'name': 'Vacation Fund',
+                            'amount': vacation_suggestion,
+                            'category': 'vacation'
+                        }
+        
         with st.form("new_goal_form"):
             st.subheader("🎯 Set a New Financial Goal")
             
+            # Pre-fill from suggestion if available
+            suggested = st.session_state.get('suggested_goal', {})
+            default_name = suggested.get('name', '')
+            default_amount = suggested.get('amount', 100000)
+            default_category = suggested.get('category', 'emergency_fund')
+            
             col1, col2 = st.columns(2)
             with col1:
-                goal_name = st.text_input("Goal Name*", placeholder="e.g., Emergency Fund, New Car")
-                target_amount = st.number_input("Target Amount (₹)*", min_value=1000, value=100000, step=1000)
+                goal_name = st.text_input("Goal Name*", value=default_name, placeholder="e.g., Emergency Fund, New Car")
+                target_amount = st.number_input("Target Amount (₹)*", min_value=1000, value=default_amount, step=1000)
                 current_amount = st.number_input("Current Savings (₹)", min_value=0, value=0, step=1000)
             
             with col2:
-                category = st.selectbox("Category*", 
-                                      ['emergency_fund', 'house', 'car', 'education', 'vacation', 'wedding', 'retirement', 'investment', 'other'],
-                                      index=0)
+                category_options = ['emergency_fund', 'house', 'car', 'education', 'vacation', 'wedding', 'retirement', 'investment', 'other']
+                default_category_index = category_options.index(default_category) if default_category in category_options else 0
+                category = st.selectbox("Category*", category_options, index=default_category_index)
                 priority = st.selectbox("Priority*", ['low', 'medium', 'high'], index=1)
                 target_date = st.date_input("Target Date (Optional)", value=None)
             
@@ -1193,6 +1463,90 @@ def show_goals():
                     st.error(f"❌ Error creating goal: {str(e)}")
                     logger.error("Goal creation failed", error=str(e), user_id=user_id)
 
+    # AI-Powered Goal Recommendations
+    st.markdown("---")
+    st.markdown("### 🎯 AI Goal Recommendations")
+    st.markdown("*Smart suggestions based on your financial profile*")
+    
+    if goals or budget_data:
+        try:
+            from src.agents.recommendation_agent import RecommendationAgent
+            recommendation_agent = RecommendationAgent()
+            
+            # Prepare recommendation context
+            recommendation_context = {
+                'user_id': user_id,
+                'existing_goals': goals,
+                'budget_data': budget_data,
+                'monthly_income': budget_data.get('income', 0) if budget_data else 0,
+                'monthly_expenses': budget_data.get('expenses', 0) if budget_data else 0,
+                'monthly_savings': budget_data.get('savings', 0) if budget_data else 0,
+                'user_context': st.session_state.user_context
+            }
+            
+            # Recommendation type buttons
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("💰 Emergency Fund", key="emergency_recommendation"):
+                    st.session_state.recommendation_type = "emergency_fund"
+            
+            with col2:
+                if st.button("📈 Investment Goals", key="investment_recommendation"):
+                    st.session_state.recommendation_type = "investment_goals"
+            
+            with col3:
+                if st.button("🏠 Major Purchases", key="major_purchase_recommendation"):
+                    st.session_state.recommendation_type = "major_purchases"
+            
+            # Generate recommendations
+            recommendation_type = st.session_state.get('recommendation_type', 'emergency_fund')
+            
+            with st.spinner("🎯 Analyzing your profile for goal recommendations..."):
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                if recommendation_type == "emergency_fund":
+                    query = "Recommend emergency fund goals based on my income and expenses"
+                elif recommendation_type == "investment_goals":
+                    query = "Suggest investment goals suitable for my risk profile and timeline"
+                elif recommendation_type == "major_purchase":
+                    query = "Recommend goals for major purchases like home, car, or education"
+                
+                response = loop.run_until_complete(
+                    recommendation_agent.process(query, recommendation_context)
+                )
+                loop.close()
+                
+                # Check if response is successful (no error in metadata and has content)
+                is_success = response.confidence > 0 and 'error' not in response.metadata and response.content
+                
+                if is_success:
+                    st.success(f"**{recommendation_type.replace('_', ' ').title()} Recommendations:**")
+                    st.markdown(response.content)
+                    
+                    # Add quick create button for recommended goals
+                    if st.button("✨ Create Recommended Goal", key="create_recommended_goal"):
+                        # Parse the recommendation to extract goal details
+                        # This is a simplified implementation - in production you'd parse the AI response
+                        st.info("💡 Feature coming soon: One-click goal creation from AI recommendations!")
+                    
+                    # Show recommendation metadata
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Recommendation Confidence", f"{response.confidence:.1f}%")
+                    with col2:
+                        st.metric("Goal Category", recommendation_type.replace('_', ' ').title())
+                else:
+                    st.error("❌ Unable to generate goal recommendations. Please try again later.")
+                    
+        except Exception as e:
+            st.warning(f"🎯 AI Goal Recommendations temporarily unavailable: {str(e)}")
+            st.info("💡 **Manual Recommendations:** Consider emergency funds (3-6 months expenses) and investment goals!")
+    else:
+        st.info("🎯 **AI Goal Recommendations will appear here once you add goals or budget data!**")
+        st.markdown("Create a budget or set an initial goal to unlock personalized AI recommendations.")
+
 # =====================================================
 # REAL-LIFE FEATURES WITH DATABASE INTEGRATION
 # =====================================================
@@ -1229,6 +1583,14 @@ def show_salary_breakup():
             del st.session_state.selected_salary_calc
             st.rerun()
     
+    # Get budget data for auto-population
+    budget_data = SessionManager.get_budget_data()
+    default_ctc = 800000.0
+    
+    if budget_data and budget_data.get('income', 0) > 0:
+        default_ctc = budget_data['income'] * 12  # Convert monthly to annual
+        st.info(f"💡 **Budget Integration**: Using your annual CTC from budget: ₹{default_ctc:,.0f}")
+    
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1240,7 +1602,8 @@ def show_salary_breakup():
         elif existing_data:
             default_ctc = float(existing_data['ctc'])
         else:
-            default_ctc = 800000.0
+            # Use budget data if available
+            pass
         
         ctc = st.number_input(
             "Annual CTC (₹)", 
@@ -1395,6 +1758,34 @@ def show_salary_breakup():
     - Effective tax rate: **{(income_tax/ctc)*100:.1f}%** of CTC
     """)
     
+    # AI Explanation Button
+    if st.button("🤖 Explain This Salary Breakup", type="secondary"):
+        try:
+            from src.agents.calculation_explanation_agent import CalculationExplanationAgent
+            explanation_agent = CalculationExplanationAgent()
+            
+            # Prepare context for explanation
+            salary_context = {
+                'ctc': ctc,
+                'basic_salary': basic_salary,
+                'hra': hra,
+                'special_allowance': special_allowance,
+                'pf_contribution': pf_contribution,
+                'professional_tax': professional_tax,
+                'income_tax': income_tax,
+                'other_deductions': other_deductions,
+                'in_hand_salary': in_hand_salary,
+                'monthly_in_hand': monthly_in_hand,
+                'total_deductions': total_deductions
+            }
+            
+            with st.spinner("🤖 Analyzing your salary breakup..."):
+                explanation = explanation_agent.explain_salary_breakup(salary_context)
+                st.info("### 🤖 AI Explanation:")
+                st.write(explanation)
+        except Exception as e:
+            st.error(f"❌ Could not generate explanation: {str(e)}")
+    
     # Historical data - Show by default if data exists
     st.markdown("---")
     st.subheader("📊 Your Saved Calculations")
@@ -1511,14 +1902,59 @@ def show_bill_reminder():
     # Add new bill form
     st.markdown("---")
     with st.expander("➕ Add New Bill", expanded=len(bills) == 0):
+        # Show budget integration info
+        budget_data = SessionManager.get_budget_data()
+        if budget_data:
+            st.info(f"💡 **Budget Integration**: Your monthly fixed expenses: ₹{budget_data.get('fixed_expenses', 0):,.0f}")
+            
+            # Smart bill suggestions based on budget
+            fixed_expenses = budget_data.get('fixed_expenses', 0)
+            if fixed_expenses > 0:
+                st.markdown("#### 💡 Smart Bill Suggestions Based on Your Budget:")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    utility_suggestion = fixed_expenses * 0.3  # 30% for utilities
+                    if st.button(f"⚡ Utilities (₹{utility_suggestion:,.0f})"):
+                        st.session_state.suggested_bill = {
+                            'name': 'Monthly Utilities',
+                            'amount': utility_suggestion,
+                            'category': 'Utilities'
+                        }
+                
+                with col2:
+                    rent_suggestion = fixed_expenses * 0.4  # 40% for rent
+                    if st.button(f"🏠 Rent (₹{rent_suggestion:,.0f})"):
+                        st.session_state.suggested_bill = {
+                            'name': 'Monthly Rent',
+                            'amount': rent_suggestion,
+                            'category': 'Rent'
+                        }
+                
+                with col3:
+                    insurance_suggestion = fixed_expenses * 0.15  # 15% for insurance
+                    if st.button(f"🛡️ Insurance (₹{insurance_suggestion:,.0f})"):
+                        st.session_state.suggested_bill = {
+                            'name': 'Monthly Insurance',
+                            'amount': insurance_suggestion,
+                            'category': 'Insurance'
+                        }
+        
         with st.form("add_bill_form"):
+            # Pre-fill from suggestion if available
+            suggested = st.session_state.get('suggested_bill', {})
+            default_name = suggested.get('name', '')
+            default_amount = suggested.get('amount', 1000)
+            default_category = suggested.get('category', 'Utilities')
+            
             fcol1, fcol2, fcol3 = st.columns(3)
             
             with fcol1:
-                bill_name = st.text_input("Bill Name*", placeholder="e.g., Electricity Bill")
-                category = st.selectbox("Category*", 
-                    ['Utilities', 'Subscription', 'Rent', 'EMI', 'Insurance', 'Credit Card', 'Other'])
-                amount = st.number_input("Amount (₹)*", min_value=0, value=1000, step=100)
+                bill_name = st.text_input("Bill Name*", value=default_name, placeholder="e.g., Electricity Bill")
+                category_options = ['Utilities', 'Subscription', 'Rent', 'EMI', 'Insurance', 'Credit Card', 'Other']
+                default_category_index = category_options.index(default_category) if default_category in category_options else 0
+                category = st.selectbox("Category*", category_options, index=default_category_index)
+                amount = st.number_input("Amount (₹)*", min_value=0, value=int(default_amount), step=100)
             
             with fcol2:
                 due_date = st.date_input("Due Date*", value=datetime.now() + timedelta(days=5))
@@ -1551,6 +1987,8 @@ def show_bill_reminder():
                     }
                     db.table('bill_reminders').insert(data).execute()
                     st.success(f"✅ Bill '{bill_name}' added successfully!")
+                    # Set flag to indicate bills data has been updated
+                    st.session_state.bills_data_updated = True
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Failed to add bill: {e}")
@@ -1579,6 +2017,8 @@ def show_bill_reminder():
                                 'last_paid_amount': bill['amount']
                             }).eq('id', bill['id']).execute()
                             st.success("✅ Paid & Removed!")
+                            # Set flag to indicate bills data has been updated
+                            st.session_state.bills_data_updated = True
                         else:
                             # For recurring bills, update payment and next due date
                             next_due = datetime.fromisoformat(bill['due_date'].replace('Z', '+00:00')).date()
@@ -1595,6 +2035,8 @@ def show_bill_reminder():
                                 'due_date': next_due.isoformat()
                             }).eq('id', bill['id']).execute()
                             st.success("✅ Paid! Next due date updated")
+                            # Set flag to indicate bills data has been updated
+                            st.session_state.bills_data_updated = True
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -1767,6 +2209,16 @@ def show_credit_card_optimizer():
     # Add new card
     st.markdown("---")
     with st.expander("➕ Add Credit Card", expanded=len(cards) == 0):
+        # Show budget integration info
+        budget_data = SessionManager.get_budget_data()
+        default_spend = 15000
+        
+        if budget_data:
+            monthly_expenses = budget_data.get('fixed_expenses', 0) + budget_data.get('variable_expenses', 0)
+            if monthly_expenses > 0:
+                default_spend = monthly_expenses * 0.6  # Assume 60% paid by credit card
+                st.info(f"💡 **Budget Integration**: Suggested monthly spend based on your expenses: ₹{default_spend:,.0f}")
+        
         with st.form("add_card_form"):
             ccol1, ccol2, ccol3 = st.columns(3)
             
@@ -1783,7 +2235,7 @@ def show_credit_card_optimizer():
                 reward_points_rate = st.number_input("Reward Points (per ₹100)", min_value=0.0, max_value=10.0, value=1.0, step=0.5)
             
             with ccol3:
-                monthly_spend = st.number_input("Avg Monthly Spend (₹)", min_value=0, value=15000, step=1000)
+                monthly_spend = st.number_input("Avg Monthly Spend (₹)", min_value=0, value=int(default_spend), step=1000)
                 credit_limit = st.number_input("Credit Limit (₹)", min_value=10000, value=100000, step=10000)
                 is_primary = st.checkbox("Set as Primary Card", value=len(cards) == 0)
             
@@ -1990,12 +2442,22 @@ def show_fd_vs_debt_fund():
     db = DatabaseClient.get_client()
     user_id = st.session_state.user_id
     
+    # Get budget data for suggestions
+    budget_data = SessionManager.get_budget_data()
+    default_investment = 100000
+    
+    if budget_data:
+        monthly_savings = budget_data.get('savings', 0)
+        if monthly_savings > 0:
+            default_investment = monthly_savings * 6  # 6 months of savings
+            st.info(f"💡 **Budget Integration**: Suggested investment amount based on your monthly savings: ₹{default_investment:,.0f}")
+    
     col1, col2 = st.columns([1, 2])
     
     with col1:
         st.subheader("💰 Investment Details")
         
-        principal = st.number_input("Investment Amount (₹)", 10000, 10000000, 100000, 10000)
+        principal = st.number_input("Investment Amount (₹)", 10000, 10000000, default_investment, 10000)
         time_period = st.selectbox("Investment Period", 
             [3, 6, 9, 12, 18, 24, 36],
             format_func=lambda x: f"{x} months ({x/12:.1f} years)" if x >= 12 else f"{x} months"
@@ -2160,6 +2622,39 @@ def show_fd_vs_debt_fund():
         - ❌ **FD** - Much higher tax at slab rate
         """)
     
+    # AI Explanation Button
+    if st.button("🤖 Explain This Comparison", type="secondary"):
+        try:
+            from src.agents.calculation_explanation_agent import CalculationExplanationAgent
+            explanation_agent = CalculationExplanationAgent()
+            
+            # Prepare context for explanation
+            fd_debt_context = {
+                'principal': principal,
+                'time_period': time_period,
+                'tax_bracket': tax_bracket,
+                'tax_rate': tax_rate,
+                'fd_rate': fd_rate,
+                'debt_fund_return': debt_fund_return,
+                'fd_maturity': fd_maturity,
+                'fd_interest': fd_interest,
+                'fd_tax': fd_tax,
+                'fd_post_tax': fd_post_tax,
+                'debt_maturity': debt_maturity,
+                'debt_gains': debt_gains,
+                'debt_tax': debt_tax,
+                'debt_post_tax': debt_post_tax,
+                'winner': winner,
+                'difference': difference
+            }
+            
+            with st.spinner("🤖 Analyzing your FD vs Debt Fund comparison..."):
+                explanation = explanation_agent.explain_investment_comparison(fd_debt_context)
+                st.info("### 🤖 AI Explanation:")
+                st.write(explanation)
+        except Exception as e:
+            st.error(f"❌ Could not generate explanation: {str(e)}")
+    
     # Historical comparison
     with st.expander("📊 View Previous Comparisons"):
         try:
@@ -2232,17 +2727,70 @@ def show_quick_money_moves():
     # Add new move
     st.markdown("---")
     with st.expander("➕ Add New Money Move", expanded=len(moves) == 0):
+        # Show budget integration info
+        budget_data = SessionManager.get_budget_data()
+        if budget_data:
+            monthly_savings = budget_data.get('savings', 0)
+            monthly_expenses = budget_data.get('fixed_expenses', 0) + budget_data.get('variable_expenses', 0)
+            st.info(f"💡 **Budget Integration**: Your monthly savings: ₹{monthly_savings:,.0f} | Expenses: ₹{monthly_expenses:,.0f}")
+            
+            # Smart move suggestions based on budget
+            if monthly_expenses > 0:
+                st.markdown("#### 🎯 Smart Money Move Suggestions Based on Your Budget:")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    subscription_savings = monthly_expenses * 0.05  # 5% from subscriptions
+                    if st.button(f"📱 Cancel Subscriptions (₹{subscription_savings:,.0f})"):
+                        st.session_state.suggested_move = {
+                            'type': 'Savings',
+                            'action': 'Cancel unused subscriptions',
+                            'impact': subscription_savings,
+                            'category': 'Subscriptions'
+                        }
+                
+                with col2:
+                    utility_savings = monthly_expenses * 0.03  # 3% from utilities
+                    if st.button(f"💡 Reduce Utility Bills (₹{utility_savings:,.0f})"):
+                        st.session_state.suggested_move = {
+                            'type': 'Savings',
+                            'action': 'Optimize utility usage',
+                            'impact': utility_savings,
+                            'category': 'Utilities'
+                        }
+                
+                with col3:
+                    if monthly_savings > 0:
+                        investment_impact = monthly_savings * 0.1  # 10% more from investments
+                        if st.button(f"📈 Start SIP (₹{investment_impact:,.0f})"):
+                            st.session_state.suggested_move = {
+                                'type': 'Investment',
+                                'action': 'Start Systematic Investment Plan',
+                                'impact': investment_impact,
+                                'category': 'Banking'
+                            }
+        
         with st.form("add_move_form"):
+            # Pre-fill from suggestion if available
+            suggested = st.session_state.get('suggested_move', {})
+            default_type = suggested.get('type', 'Savings')
+            default_action = suggested.get('action', '')
+            default_impact = suggested.get('impact', 500)
+            default_category = suggested.get('category', 'Other')
+            
             mcol1, mcol2, mcol3 = st.columns(3)
             
             with mcol1:
-                move_type = st.selectbox("Type*", ['Savings', 'Earning', 'Debt Reduction', 'Investment'])
-                action_item = st.text_input("Action Item*", placeholder="e.g., Cancel unused subscriptions")
-                category = st.selectbox("Category", 
-                    ['Banking', 'Subscriptions', 'Utilities', 'Shopping', 'Food', 'Transport', 'Other'])
+                type_options = ['Savings', 'Earning', 'Debt Reduction', 'Investment']
+                default_type_index = type_options.index(default_type) if default_type in type_options else 0
+                move_type = st.selectbox("Type*", type_options, index=default_type_index)
+                action_item = st.text_input("Action Item*", value=default_action, placeholder="e.g., Cancel unused subscriptions")
+                category_options = ['Banking', 'Subscriptions', 'Utilities', 'Shopping', 'Food', 'Transport', 'Other']
+                default_category_index = category_options.index(default_category) if default_category in category_options else 6
+                category = st.selectbox("Category", category_options, index=default_category_index)
             
             with mcol2:
-                estimated_impact = st.number_input("Estimated Impact (₹/month)", 0, 100000, 500, 100)
+                estimated_impact = st.number_input("Estimated Impact (₹/month)", 0, 100000, int(default_impact), 100)
                 difficulty = st.selectbox("Difficulty", ['Easy', 'Medium', 'Hard'])
                 time_required = st.selectbox("Time Required", 
                     ['5 mins', '15 mins', '30 mins', '1 hour', '2 hours', '1 day'])
@@ -2271,6 +2819,8 @@ def show_quick_money_moves():
                     if result.data:
                         st.success(f"✅ Money move '{action_item}' added!")
                         st.balloons()
+                        # Set flag to indicate money moves data has been updated
+                        st.session_state.moves_data_updated = True
                         st.rerun()
                     else:
                         st.warning("⚠️ Move added but no confirmation received")
@@ -2531,7 +3081,7 @@ def main():
                  "💳 EMI Calculator", "💎 80C Comparator", "🏖️ Retirement Planner",
                  "📊 Expense Analytics", "👤 Profile",
                  "💰 Salary Breakup", "📱 Bill Reminder", "💳 Credit Card Optimizer",
-                 "🏦 FD vs Debt Fund", "⚡ Quick Money Moves", "📚 Knowledge Base"]
+                 "🏦 FD vs Debt Fund", "⚡ Quick Money Moves", "📚 Knowledge Base", "📄 Document Parser"]
         
         # Add admin dashboard for admin users
         if SessionManager.is_admin():
@@ -2626,6 +3176,9 @@ def main():
         show_quick_money_moves()
     elif page == "📚 Knowledge Base":
         show_knowledge_base()
+    elif page == "📄 Document Parser":
+        from src.ui.pages.features.document_parser import show_document_parser
+        show_document_parser()
 
 def show_dashboard():
     """Dashboard with real data, graphs, and insights"""
@@ -2851,8 +3404,8 @@ def show_dashboard():
         # Calculate savings
         monthly_savings = monthly_income - monthly_expenses
     
-    # Get emergency fund from user profile or calculate
-    emergency_fund = monthly_income * 3 if monthly_income > 0 else 0
+    # Get emergency fund from user profile or calculate (3-6 months of expenses)
+    emergency_fund = monthly_expenses * 6 if monthly_expenses > 0 else 0
     
     # Get EMI data from transactions
     monthly_emi = 0
@@ -2967,6 +3520,181 @@ def show_dashboard():
     
     except Exception as e:
         st.warning(f"Could not load activity timeline: {str(e)}")
+    
+    st.markdown("---")
+    
+    # Portfolio Overview Section
+    st.markdown("### 📈 Portfolio Overview")
+    st.success("✅ Portfolio section is loading...")
+    
+    # Check if portfolio data was recently updated
+    if 'portfolio_data_updated' in st.session_state and st.session_state.portfolio_data_updated:
+        st.info("📊 Portfolio data has been updated! Click refresh to see the latest changes.")
+        st.session_state.portfolio_data_updated = False  # Reset the flag
+    
+    # Add refresh button for portfolio data
+    col_refresh, col_empty = st.columns([1, 4])
+    with col_refresh:
+        if st.button("🔄 Refresh Portfolio", key="refresh_portfolio", help="Refresh portfolio data from database"):
+            # Clear any cached portfolio data
+            if 'portfolio_data_cache' in st.session_state:
+                del st.session_state.portfolio_data_cache
+            if 'portfolio_last_updated' in st.session_state:
+                del st.session_state.portfolio_last_updated
+            st.rerun()
+    
+    try:
+        from src.services.features_service import FeaturesService
+        features_service = FeaturesService()
+        portfolio_data = features_service.get_portfolio(user_id)
+        
+        if portfolio_data:
+            # Calculate portfolio metrics
+            total_value = sum(float(asset.get('current_value', asset.get('quantity', 0) * asset.get('current_price', asset.get('average_buy_price', 0)))) for asset in portfolio_data)
+            invested_value = sum(float(asset.get('quantity', 0) * asset.get('average_buy_price', 0)) for asset in portfolio_data)
+            total_pnl = total_value - invested_value
+            pnl_percentage = (total_pnl / invested_value * 100) if invested_value > 0 else 0
+            
+            # Show last updated time
+            from datetime import datetime
+            last_updated = st.session_state.get('portfolio_last_updated', datetime.now())
+            st.caption(f"📅 Last updated: {last_updated.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Value", f"₹{total_value:,.0f}")
+            with col2:
+                st.metric("Invested Amount", f"₹{invested_value:,.0f}")
+            with col3:
+                st.metric("Total P&L", f"₹{total_pnl:,.0f}", f"{pnl_percentage:+.1f}%")
+            with col4:
+                st.metric("Assets", len(portfolio_data))
+            
+            # Top 3 holdings
+            if len(portfolio_data) > 0:
+                st.markdown("**Top Holdings:**")
+                sorted_assets = sorted(portfolio_data, key=lambda x: float(x.get('current_value', 0)), reverse=True)[:3]
+                
+                for asset in sorted_assets:
+                    asset_value = float(asset.get('current_value', asset.get('quantity', 0) * asset.get('current_price', asset.get('average_buy_price', 0))))
+                    asset_name = asset.get('asset_name', asset.get('symbol', 'Unknown'))
+                    percentage = (asset_value / total_value * 100) if total_value > 0 else 0
+                    
+                    st.markdown(f"- **{asset_name}**: ₹{asset_value:,.0f} ({percentage:.1f}%)")
+        else:
+            st.info("📊 No portfolio data yet. Add your first investment!")
+    except Exception as e:
+        st.error(f"Could not load portfolio data: {str(e)}")
+        st.exception(e)
+    
+    # Upcoming Bills Section
+    st.markdown("---")
+    st.markdown("### 📱 Upcoming Bills")
+    st.success("✅ Bills section is loading...")
+    
+    # Check if bills data was recently updated
+    if 'bills_data_updated' in st.session_state and st.session_state.bills_data_updated:
+        st.info("📱 Bills data has been updated! Click refresh to see the latest changes.")
+        st.session_state.bills_data_updated = False  # Reset the flag
+    
+    # Add refresh button for bills data
+    col_refresh, col_empty = st.columns([1, 4])
+    with col_refresh:
+        if st.button("🔄 Refresh Bills", key="refresh_bills", help="Refresh bills data from database"):
+            st.rerun()
+    
+    try:
+        bills_result = db.table('bill_reminders').select('*').eq('user_id', user_id).eq('is_active', True).order('due_date').execute()
+        bills_data = bills_result.data if bills_result.data else []
+        
+        if bills_data:
+            from datetime import datetime
+            today = datetime.now().date()
+            
+            # Get upcoming bills (next 30 days)
+            upcoming_bills = []
+            for bill in bills_data:
+                due_date = datetime.fromisoformat(bill['due_date'].replace('Z', '+00:00')).date()
+                if due_date >= today and (due_date - today).days <= 30:
+                    upcoming_bills.append({
+                        'name': bill['bill_name'],
+                        'amount': float(bill['amount']),
+                        'due_date': due_date,
+                        'days_left': (due_date - today).days,
+                        'category': bill.get('category', 'Other')
+                    })
+            
+            upcoming_bills = sorted(upcoming_bills, key=lambda x: x['days_left'])[:5]  # Top 5 upcoming
+            
+            if upcoming_bills:
+                total_upcoming = sum(bill['amount'] for bill in upcoming_bills)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Upcoming Bills (30 days)", len(upcoming_bills))
+                with col2:
+                    st.metric("Total Amount Due", f"₹{total_upcoming:,.0f}")
+                
+                # Show next 3 bills
+                st.markdown("**Next Bills Due:**")
+                for bill in upcoming_bills[:3]:
+                    urgency_color = "🔴" if bill['days_left'] <= 3 else "🟡" if bill['days_left'] <= 7 else "🟢"
+                    st.markdown(f"- {urgency_color} **{bill['name']}**: ₹{bill['amount']:,.0f} ({bill['days_left']} days)")
+            else:
+                st.success("✅ No bills due in the next 30 days!")
+        else:
+            st.info("📱 No bills configured yet. Add your recurring bills!")
+    except Exception as e:
+        st.error(f"Could not load bills data: {str(e)}")
+        st.exception(e)
+    
+    # Quick Money Moves Section
+    st.markdown("---")
+    st.markdown("### ⚡ Quick Money Moves")
+    st.success("✅ Money moves section is loading...")
+    
+    # Check if money moves data was recently updated
+    if 'moves_data_updated' in st.session_state and st.session_state.moves_data_updated:
+        st.info("⚡ Money moves data has been updated! Click refresh to see the latest changes.")
+        st.session_state.moves_data_updated = False  # Reset the flag
+    
+    # Add refresh button for money moves data
+    col_refresh, col_empty = st.columns([1, 4])
+    with col_refresh:
+        if st.button("🔄 Refresh Moves", key="refresh_moves", help="Refresh money moves data from database"):
+            st.rerun()
+    
+    try:
+        moves_result = db.table('quick_money_moves').select('*').eq('user_id', user_id).eq('status', 'Pending').order('priority', desc=True).execute()
+        pending_moves = moves_result.data if moves_result.data else []
+        
+        if pending_moves:
+            # Calculate potential impact
+            total_potential = sum(float(move.get('estimated_impact', 0)) for move in pending_moves)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Pending Actions", len(pending_moves))
+            with col2:
+                st.metric("Potential Monthly Savings", f"₹{total_potential:,.0f}")
+            
+            # Show top 3 high-priority moves
+            st.markdown("**Top Actions:**")
+            high_priority_moves = [move for move in pending_moves if move.get('priority', 1) >= 4][:3]
+            
+            for move in high_priority_moves:
+                impact = float(move.get('estimated_impact', 0))
+                difficulty = move.get('difficulty_level', 'Medium')
+                time_required = move.get('time_required', 'Unknown')
+                
+                difficulty_icon = "🟢" if difficulty == "Easy" else "🟡" if difficulty == "Medium" else "🔴"
+                
+                st.markdown(f"- {difficulty_icon} **{move['action_item']}**: ₹{impact:,.0f}/mo ({time_required})")
+        else:
+            st.info("⚡ No pending money moves. Add actions to save money!")
+    except Exception as e:
+        st.error(f"Could not load money moves data: {str(e)}")
+        st.exception(e)
     
     st.markdown("---")
     
@@ -3092,7 +3820,7 @@ def show_dashboard():
         
         # Quick breakdown
         st.markdown("**Latest Salary Components:**")
-        components = {
+        salary_components = {
             'Basic Salary': latest_salary['basic_salary'],
             'HRA': latest_salary['hra'],
             'Special Allowance': latest_salary['special_allowance'],
@@ -3103,7 +3831,7 @@ def show_dashboard():
         
         # Display as small metrics
         cols = st.columns(3)
-        for i, (component, amount) in enumerate(components.items()):
+        for i, (component, amount) in enumerate(salary_components.items()):
             with cols[i % 3]:
                 st.metric(component, f"₹{amount:,.0f}", f"{(amount/ctc)*100:.1f}%")
     else:
@@ -3111,59 +3839,242 @@ def show_dashboard():
     
     st.markdown("---")
     
-    # Recent Transactions
-    st.markdown("### 💳 Recent Transactions")
-    
-    # Get real transactions from database
+    # Expense Analytics Section (only show if user has transactions)
     if has_transactions:
-        transactions_list = transactions_result.data
+        st.markdown("### 📊 Expense Analytics")
         
-        # Format transactions for display
-        formatted_transactions = []
-        for txn in transactions_list:
-            amount = float(txn.get('amount', 0))
-            formatted_transactions.append({
-                'date': txn.get('created_at', '')[:10],  # Extract date from timestamp
-                'description': txn.get('description', 'Transaction'),
-                'category': txn.get('category', 'Other'),
-                'amount': amount,
-                'type': 'credit' if amount > 0 else 'debit'
-            })
+        # Get all transactions for analytics
+        all_transactions = db.table('transactions').select('*').eq('user_id', user_id).eq('type', 'expense').execute()
+        
+        if all_transactions.data:
+            import pandas as pd
+            from datetime import datetime
+            
+            # Convert to DataFrame
+            df = pd.DataFrame(all_transactions.data)
+            df['date'] = pd.to_datetime(df['date'])
+            df['month'] = df['date'].dt.to_period('M').astype(str)
+            df['amount'] = df['amount'].astype(float)
+            
+            # Current month stats
+            current_month = df['month'].max()
+            current_month_data = df[df['month'] == current_month]
+            
+            if not current_month_data.empty:
+                col1, col2, col3, col4 = st.columns(4)
+                
+                total_spend = current_month_data['amount'].sum()
+                avg_daily = total_spend / 30
+                top_category = current_month_data.groupby('category')['amount'].sum().idxmax()
+                top_category_amount = current_month_data.groupby('category')['amount'].sum().max()
+                category_count = current_month_data['category'].nunique()
+                
+                with col1:
+                    st.metric("This Month Spend", f"₹{total_spend:,.0f}")
+                with col2:
+                    st.metric("Avg Daily Spend", f"₹{avg_daily:,.0f}")
+                with col3:
+                    st.metric("Top Category", top_category)
+                with col4:
+                    st.metric("Active Categories", f"{category_count}")
+                
+                # Category breakdown
+                st.markdown("#### 📈 Spending by Category")
+                category_totals = current_month_data.groupby('category')['amount'].sum().sort_values(ascending=False)
+                
+                # Create horizontal bar chart
+                fig_category = go.Figure(data=[go.Bar(
+                    x=category_totals.values,
+                    y=category_totals.index,
+                    orientation='h',
+                    marker=dict(color='#4ECDC4'),
+                    text=[f"₹{val:,.0f}" for val in category_totals.values],
+                    textposition='auto'
+                )])
+                
+                fig_category.update_layout(
+                    title="Monthly Spending Breakdown",
+                    xaxis_title="Amount (₹)",
+                    height=max(300, len(category_totals) * 40),
+                    margin=dict(t=50, b=20, l=20, r=20)
+                )
+                
+                st.plotly_chart(fig_category, use_container_width=True)
+                
+                # Recent expense transactions
+                st.markdown("#### 💳 Recent Expenses")
+                recent_expenses = current_month_data.sort_values('date', ascending=False).head(5)
+                
+                for _, expense in recent_expenses.iterrows():
+                    col1, col2, col3 = st.columns([2, 4, 2])
+                    with col1:
+                        st.write(f"**{expense['date'].strftime('%d %b')}**")
+                    with col2:
+                        st.write(f"📁 {expense['category']}")
+                        st.caption(expense['description'])
+                    with col3:
+                        st.write(f"₹{expense['amount']:,.0f}")
+                    st.markdown("<hr style='margin: 0.3rem 0; opacity: 0.2;'>", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # AI-Powered Financial Insights
+    st.markdown("### 🤖 AI Financial Insights")
+    st.markdown("*Personalized analysis and recommendations*")
+    
+    # Generate insights using InsightsAgent
+    if has_budget or has_goals or has_transactions:
+        try:
+            from src.agents.insights_agent import InsightsAgent
+            insights_agent = InsightsAgent()
+            
+            # Prepare user context for insights
+            insights_context = {
+                'user_id': user_id,
+                'has_budget': has_budget,
+                'has_goals': has_goals,
+                'has_transactions': has_transactions,
+                'monthly_income': monthly_income,
+                'budget_count': len(budgets_result.data) if has_budget else 0,
+                'goals_count': len(goals_result.data) if has_goals else 0,
+                'transactions_count': len(transactions_result.data) if has_transactions else 0,
+                'user_context': st.session_state.user_context
+            }
+            
+            # Quick insight buttons
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("📊 Monthly Summary", key="monthly_summary"):
+                    st.session_state.insights_type = "monthly_summary"
+            
+            with col2:
+                if st.button("🎯 Goal Progress", key="goal_progress"):
+                    st.session_state.insights_type = "goal_progress"
+            
+            with col3:
+                if st.button("💡 Spending Analysis", key="spending_analysis"):
+                    st.session_state.insights_type = "spending_analysis"
+            
+            # Generate insights based on selection
+            insights_type = st.session_state.get('insights_type', 'monthly_summary')
+            
+            with st.spinner("🤔 Analyzing your financial data..."):
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                if insights_type == "monthly_summary":
+                    query = "Provide a comprehensive monthly financial summary with key insights and recommendations"
+                elif insights_type == "goal_progress":
+                    query = "Analyze my goal progress and provide recommendations for better goal achievement"
+                elif insights_type == "spending_analysis":
+                    query = "Analyze my spending patterns and provide insights for better financial habits"
+                
+                response = loop.run_until_complete(
+                    insights_agent.process(query, insights_context)
+                )
+                loop.close()
+                
+                # Check if response is successful (no error in metadata and has content)
+                is_success = response.confidence > 0 and 'error' not in response.metadata and response.content
+                
+                if is_success:
+                    st.success(f"**{insights_type.replace('_', ' ').title()} Insights:**")
+                    st.markdown(response.content)
+                    
+                    # Show confidence and metadata
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Confidence", f"{response.confidence:.1f}%")
+                    with col2:
+                        st.metric("Analysis Type", insights_type.replace('_', ' ').title())
+                else:
+                    st.error("❌ Unable to generate insights at this time. Please try again later.")
+                    
+        except Exception as e:
+            st.warning(f"🤖 AI Insights temporarily unavailable: {str(e)}")
+            st.info("💡 **Manual Insights:** Keep tracking your expenses and goals regularly for better financial health!")
     else:
-        st.info("📊 No transactions yet. Start tracking your expenses!")
-        formatted_transactions = []
+        st.info("🤖 **AI Insights will appear here once you add budget, goals, or transactions!**")
+        st.markdown("Start by creating a budget or setting a financial goal to unlock personalized AI analysis.")
     
-    # Transaction table with styling
-    for idx, txn in enumerate(formatted_transactions[:10]):
-        col1, col2, col3, col4 = st.columns([2, 3, 2, 2])
-        
-        # Color coding
-        amount_color = "#4CAF50" if txn['amount'] > 0 else "#FF5252"
-        icon = "💰" if txn['amount'] > 0 else "💸"
-        
-        with col1:
-            st.markdown(f"**{txn['date']}**")
-        
-        with col2:
-            st.markdown(f"{icon} {txn['description']}")
-            st.caption(f"📁 {txn['category']}")
-        
-        with col3:
-            st.markdown(f"<span style='color: {amount_color}; font-weight: bold; font-size: 1.1rem;'>₹{abs(txn['amount']):,.0f}</span>", unsafe_allow_html=True)
-        
-        with col4:
-            if txn['amount'] > 0:
-                st.success("Credit", icon="✅")
-            else:
-                st.error("Debit", icon="⬇️")
-        
-        if idx < len(formatted_transactions[:10]) - 1:
-            st.markdown("<hr style='margin: 0.5rem 0; opacity: 0.2;'>", unsafe_allow_html=True)
+    # Behavioral Analysis Section
+    st.markdown("### 🧠 Behavioral Analysis")
+    st.markdown("*Understand your spending psychology and habits*")
     
-    # View all transactions button
-    if len(formatted_transactions) > 10:
-        if st.button("📋 View All Transactions"):
-            st.info(f"Showing {len(formatted_transactions)} total transactions")
+    if has_transactions:
+        try:
+            from src.agents.behavioral_analysis_agent import BehavioralAnalysisAgent
+            behavioral_agent = BehavioralAnalysisAgent()
+            
+            # Prepare behavioral context
+            behavioral_context = {
+                'user_id': user_id,
+                'transactions': transactions_result.data if has_transactions else [],
+                'monthly_income': monthly_income,
+                'user_context': st.session_state.user_context
+            }
+            
+            # Behavioral analysis buttons
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("🎭 Spending Triggers", key="spending_triggers"):
+                    st.session_state.behavioral_type = "spending_triggers"
+            
+            with col2:
+                if st.button("📈 Habit Patterns", key="habit_patterns"):
+                    st.session_state.behavioral_type = "habit_patterns"
+            
+            with col3:
+                if st.button("💪 Improvement Tips", key="improvement_tips"):
+                    st.session_state.behavioral_type = "improvement_tips"
+            
+            # Generate behavioral analysis
+            behavioral_type = st.session_state.get('behavioral_type', 'spending_triggers')
+            
+            with st.spinner("🧠 Analyzing your behavioral patterns..."):
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                if behavioral_type == "spending_triggers":
+                    query = "Identify my spending triggers and emotional spending patterns"
+                elif behavioral_type == "habit_patterns":
+                    query = "Analyze my financial habits and provide insights on spending behavior"
+                elif behavioral_type == "improvement_tips":
+                    query = "Provide personalized tips to improve my financial discipline and habits"
+                
+                response = loop.run_until_complete(
+                    behavioral_agent.process(query, behavioral_context)
+                )
+                loop.close()
+                
+                # Check if response is successful (no error in metadata and has content)
+                is_success = response.confidence > 0 and 'error' not in response.metadata and response.content
+                
+                if is_success:
+                    st.success(f"**{behavioral_type.replace('_', ' ').title()} Analysis:**")
+                    st.markdown(response.content)
+                    
+                    # Behavioral insights metrics
+                    if 'insights' in response.metadata:
+                        insights = response.metadata['insights']
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Pattern Confidence", f"{response.confidence:.1f}%")
+                        with col2:
+                            st.metric("Key Insights", len(insights) if isinstance(insights, list) else 1)
+                        with col3:
+                            st.metric("Analysis Focus", behavioral_type.replace('_', ' ').title())
+                else:
+                    st.error("❌ Behavioral analysis unavailable. Please try again later.")
+                    
+        except Exception as e:
+            st.warning(f"🧠 Behavioral Analysis temporarily unavailable: {str(e)}")
+            st.info("💡 **Manual Analysis:** Track your spending patterns to understand your financial behavior!")
+    else:
+        st.info("🧠 **Behavioral Analysis will appear here once you add transactions!**")
+        st.markdown("Add some expense transactions to unlock AI-powered behavioral insights.")
     
     st.markdown("---")
     
@@ -3179,6 +4090,8 @@ def show_dashboard():
     }
     
     for key, score in components.items():
+        # Ensure score is between 0-100
+        score = max(0, min(100, score))
         col_a, col_b = st.columns([3, 1])
         with col_a:
             st.progress(score / 100)
@@ -3381,102 +4294,116 @@ def show_budget():
         )
         
         submitted = st.form_submit_button("💾 Save Budget", type="primary")
+    
+    # Handle form submission outside the form
+    if submitted:
+        # Parse custom categories
+        allocations = {}
+        fixed_expenses_breakdown = {}
+        variable_expenses_breakdown = {}
         
-        if submitted:
-            # Parse custom categories
-            allocations = {}
-            fixed_expenses_breakdown = {}
-            variable_expenses_breakdown = {}
-            
-            if custom_categories.strip():
-                for line in custom_categories.strip().split('\n'):
-                    if ':' in line:
-                        category, amount_str = line.split(':', 1)
-                        try:
-                            amount = float(amount_str.strip())
-                            allocations[category.strip()] = amount
-                            # Categorize as variable expenses for now
-                            variable_expenses_breakdown[category.strip()] = amount
-                        except ValueError:
-                            st.warning(f"Invalid amount for category '{category.strip()}'. Skipping.")
-            
-            # Add standard categories to allocations
-            allocations.update({
+        if custom_categories.strip():
+            for line in custom_categories.strip().split('\n'):
+                if ':' in line:
+                    category, amount_str = line.split(':', 1)
+                    try:
+                        amount = float(amount_str.strip())
+                        allocations[category.strip()] = amount
+                        # Categorize as variable expenses for now
+                        variable_expenses_breakdown[category.strip()] = amount
+                    except ValueError:
+                        st.warning(f"Invalid amount for category '{category.strip()}'. Skipping.")
+        
+        # Add standard categories to allocations
+        allocations.update({
+            'Rent': rent,
+            'Utilities': utilities,
+            'Insurance': insurance,
+            'Loan EMI': loan_emi,
+            'Food': food,
+            'Transport': transport,
+            'Entertainment': entertainment,
+            'Miscellaneous': miscellaneous,
+            'Savings': savings,
+            'Investments': investments
+        })
+        
+        budget_data = {
+            'income': monthly_income,
+            'fixed_expenses': rent + utilities + insurance + loan_emi,
+            'variable_expenses': food + transport + entertainment + miscellaneous + sum(variable_expenses_breakdown.values()),
+            'savings': savings,
+            'investments': investments,
+            'fixed_expenses_breakdown': {
                 'Rent': rent,
                 'Utilities': utilities,
                 'Insurance': insurance,
-                'Loan EMI': loan_emi,
+                'Loan EMI': loan_emi
+            },
+            'variable_expenses_breakdown': {
                 'Food': food,
                 'Transport': transport,
                 'Entertainment': entertainment,
                 'Miscellaneous': miscellaneous,
-                'Savings': savings,
-                'Investments': investments
-            })
+                **variable_expenses_breakdown
+            },
+            'allocations': allocations,
+            'month': datetime.now().strftime('%Y-%m')
+        }
+        
+        # Save to database
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result = loop.run_until_complete(
+                budget_service.create_budget(user_id, budget_data)
+            )
+            loop.close()
             
-            budget_data = {
-                'income': monthly_income,
-                'fixed_expenses': rent + utilities + insurance + loan_emi,
-                'variable_expenses': food + transport + entertainment + miscellaneous + sum(variable_expenses_breakdown.values()),
-                'savings': savings,
-                'investments': investments,
-                'fixed_expenses_breakdown': {
-                    'Rent': rent,
-                    'Utilities': utilities,
-                    'Insurance': insurance,
-                    'Loan EMI': loan_emi
-                },
-                'variable_expenses_breakdown': {
-                    'Food': food,
-                    'Transport': transport,
-                    'Entertainment': entertainment,
-                    'Miscellaneous': miscellaneous,
-                    **variable_expenses_breakdown
-                },
-                'allocations': allocations,
-                'month': datetime.now().strftime('%Y-%m')
-            }
-            
-            # Save to database
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                result = loop.run_until_complete(
-                    budget_service.create_budget(user_id, budget_data)
-                )
-                loop.close()
+            if result:
+                st.success("✅ Budget saved successfully to database!")
                 
-                if result:
-                    st.success("✅ Budget saved successfully to database!")
-                    
-                    # Calculate and display summary
-                    summary = budget_service.calculate_budget_summary(budget_data)
-                    
-                    st.markdown("### 📊 Budget Summary")
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Total Income", f"₹{summary['total_income']:,.0f}")
-                    with col2:
-                        st.metric("Total Expenses", f"₹{summary['total_expenses']:,.0f}")
-                    with col3:
-                        st.metric("Total Savings", f"₹{summary['total_savings']:,.0f}")
-                    with col4:
-                        st.metric("Savings Rate", f"{summary['savings_rate']:.1f}%")
-                    
-                    if summary['is_balanced']:
-                        st.success(f"✅ Budget is balanced! You have ₹{summary['balance']:,.0f} left for discretionary spending.")
-                    else:
-                        st.warning(f"⚠️ Budget exceeds income by ₹{abs(summary['balance']):,.0f}. Consider reducing expenses or increasing income.")
-                    
-                    # Refresh page to show updated dashboard
-                    st.info("🔄 Dashboard will be updated with your new budget data.")
-                    st.rerun()
-                else:
-                    st.error("❌ Failed to save budget. Please try again.")
-                    
-            except Exception as e:
-                st.error(f"❌ Error saving budget: {str(e)}")
-                logger.error("Budget save failed", error=str(e), user_id=user_id)
+                # Store budget data and summary in session state for display outside form
+                st.session_state.saved_budget_data = budget_data
+                st.session_state.saved_budget_summary = budget_service.calculate_budget_summary(budget_data)
+                st.session_state.budget_just_saved = True
+            else:
+                st.error("❌ Failed to save budget. Please try again.")
+                
+        except Exception as e:
+            st.error(f"❌ Error saving budget: {str(e)}")
+            logger.error("Budget save failed", error=str(e), user_id=user_id)
+    
+    # Display budget summary outside the form if budget was just saved
+    if 'saved_budget_summary' in st.session_state and st.session_state.get('budget_just_saved', False):
+        summary = st.session_state.saved_budget_summary
+        
+        st.markdown("### 📊 Budget Summary")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Income", f"₹{summary['total_income']:,.0f}")
+        with col2:
+            st.metric("Total Expenses", f"₹{summary['total_expenses']:,.0f}")
+        with col3:
+            st.metric("Total Savings", f"₹{summary['total_savings']:,.0f}")
+        with col4:
+            st.metric("Savings Rate", f"{summary['savings_rate']:.1f}%")
+        
+        if summary['is_balanced']:
+            st.success(f"✅ Budget is balanced! You have ₹{summary['balance']:,.0f} left for discretionary spending.")
+        else:
+            st.warning(f"⚠️ Budget exceeds income by ₹{abs(summary['balance']):,.0f}. Consider reducing expenses or increasing income.")
+        
+        # Refresh button outside the form
+        if st.button("🔄 Update Dashboard with New Budget", type="secondary"):
+            st.info("🔄 Refreshing dashboard...")
+            # Clear the saved budget state
+            if 'saved_budget_data' in st.session_state:
+                del st.session_state.saved_budget_data
+            if 'saved_budget_summary' in st.session_state:
+                del st.session_state.saved_budget_summary
+            st.session_state.budget_just_saved = False
+            st.rerun()
 
 def show_goals():
     """Financial goals manager with full CRUD operations"""
@@ -3705,10 +4632,18 @@ def show_tax_calculator():
     from src.agents.tax_agent import TaxCalculatorAgent
     tax_agent = TaxCalculatorAgent()
     
+    # Get budget data for auto-population
+    budget_data = SessionManager.get_budget_data()
+    default_income = 1200000
+    
+    if budget_data and budget_data.get('income', 0) > 0:
+        default_income = budget_data['income'] * 12  # Convert monthly to annual
+        st.info(f"💡 **Budget Integration**: Using your annual income from budget: ₹{default_income:,.0f}")
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        annual_income = st.number_input("Annual Income (₹)", min_value=0, value=1200000, step=50000)
+        annual_income = st.number_input("Annual Income (₹)", min_value=0, value=default_income, step=50000)
     
     with col2:
         deductions_amount = st.number_input("Deductions (80C, 80D, etc.) (₹)", min_value=0, value=150000, step=10000)
@@ -3747,6 +4682,29 @@ def show_tax_calculator():
         else:
             savings = old_tax['final_tax'] - new_tax['final_tax']
             st.success(f"💡 **Recommendation**: Choose New Regime. You save ₹{savings:,.0f}!")
+        
+        # AI Explanation Button
+        if st.button("🤖 Explain This Calculation", type="secondary"):
+            try:
+                from src.agents.calculation_explanation_agent import CalculationExplanationAgent
+                explanation_agent = CalculationExplanationAgent()
+                
+                # Prepare context for explanation
+                tax_context = {
+                    'annual_income': annual_income,
+                    'deductions': deductions,
+                    'old_regime_tax': old_tax,
+                    'new_regime_tax': new_tax,
+                    'recommended_regime': 'old' if old_tax['final_tax'] < new_tax['final_tax'] else 'new',
+                    'savings': savings
+                }
+                
+                with st.spinner("🤖 Analyzing your tax calculation..."):
+                    explanation = explanation_agent.explain_tax_calculation(tax_context)
+                    st.info("### 🤖 AI Explanation:")
+                    st.write(explanation)
+            except Exception as e:
+                st.error(f"❌ Could not generate explanation: {str(e)}")
 
 def show_sip_planner():
     """SIP Calculator with real calculations"""
@@ -3781,6 +4739,27 @@ def show_sip_planner():
             st.metric("Maturity Value", f"₹{result['maturity_value']:,.0f}")
         
         st.info(f"📊 Your wealth will grow by {result['wealth_gain_percentage']:.1f}%")
+        
+        # AI Explanation Button
+        if st.button("🤖 Explain This Calculation", type="secondary"):
+            try:
+                from src.agents.calculation_explanation_agent import CalculationExplanationAgent
+                explanation_agent = CalculationExplanationAgent()
+                
+                # Prepare context for explanation
+                sip_context = {
+                    'monthly_sip': monthly_sip,
+                    'years': years,
+                    'expected_return': expected_return,
+                    'result': result
+                }
+                
+                with st.spinner("🤖 Analyzing your SIP calculation..."):
+                    explanation = explanation_agent.explain_investment_calculation(sip_context)
+                    st.info("### 🤖 AI Explanation:")
+                    st.write(explanation)
+            except Exception as e:
+                st.error(f"❌ Could not generate explanation: {str(e)}")
 
 def show_profile():
     """User profile"""
