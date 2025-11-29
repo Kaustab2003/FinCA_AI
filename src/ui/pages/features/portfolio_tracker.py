@@ -5,25 +5,13 @@ from src.services.features_service import FeaturesService
 from src.utils.session_manager import SessionManager
 
 def show_portfolio_tracker():
-    st.header("📈 Investment Portfolio")
     user_email = SessionManager.get_user_email()
-    # We need user_id, but SessionManager usually stores email. 
-    # Assuming we can get user_id via auth service or it's stored in session.
-    # For now, let's try to get it from session state if available, or fetch via email.
+    user_id = SessionManager.get_user_id()
     
-    # Ideally SessionManager should provide user_id. 
-    # Let's check how other pages get user_id. 
-    # Looking at app_integrated.py, it seems user_id is often fetched from db using email.
-    
-    from src.services.auth_service import AuthService
-    auth_service = AuthService()
-    user_profile = auth_service.get_user_profile(user_email)
-    
-    if not user_profile:
-        st.error("Please login.")
+    if not user_id:
+        st.error("Please login to access portfolio features.")
         return
-
-    user_id = user_profile['user_id']
+    
     service = FeaturesService()
     
     # Tabs

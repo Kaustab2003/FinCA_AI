@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str = Field(..., env="SUPABASE_ANON_KEY")
     SUPABASE_SERVICE_KEY: str = Field(..., env="SUPABASE_SERVICE_KEY")
     SUPABASE_JWT_SECRET: str = Field(..., env="SUPABASE_JWT_SECRET")
+
+    # Supabase Auth Configuration
+    SUPABASE_AUTH_ENABLED: bool = Field(default=True, env="SUPABASE_AUTH_ENABLED")
+    SUPABASE_AUTH_AUTO_REFRESH: bool = Field(default=True, env="SUPABASE_AUTH_AUTO_REFRESH")
+    SUPABASE_AUTH_PERSIST_SESSION: bool = Field(default=True, env="SUPABASE_AUTH_PERSIST_SESSION")
     
     # Database
     DATABASE_URL: Optional[str] = Field(default=None, env="DATABASE_URL")

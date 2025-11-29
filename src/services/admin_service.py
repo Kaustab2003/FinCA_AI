@@ -15,7 +15,7 @@ class AdminService:
     def __init__(self):
         # Use service role client for admin operations (bypasses RLS)
         self.db = DatabaseClient.get_service_client()
-        self.regular_db = DatabaseClient.get_client()
+        self.regular_db = DatabaseClient.get_authenticated_client()
     
     def get_all_users(self, limit: int = 100, offset: int = 0) -> List[Dict]:
         """

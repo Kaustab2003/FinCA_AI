@@ -42,7 +42,13 @@ class SessionManager:
             }
             
             # Store tokens for API calls
-            if 'access_token' in user_data:
+            if 'session' in user_data and user_data['session']:
+                session_data = user_data['session']
+                if 'access_token' in session_data:
+                    st.session_state.access_token = session_data['access_token']
+                if 'refresh_token' in session_data:
+                    st.session_state.refresh_token = session_data['refresh_token']
+            elif 'access_token' in user_data:
                 st.session_state.access_token = user_data['access_token']
             if 'refresh_token' in user_data:
                 st.session_state.refresh_token = user_data['refresh_token']
@@ -221,18 +227,21 @@ class SessionManager:
             return None
     
     @staticmethod
-    def get_session_info() -> Dict:
+    def get_access_token() -> Optional[str]:
         """
-        Get comprehensive session information for debugging
+        Get access token from session
         
         Returns:
-            Dictionary with session details
+            Access token or None if not available
         """
-        return {
-            'authenticated': SessionManager.is_authenticated(),
-            'user_id': SessionManager.get_user_id(),
-            'email': SessionManager.get_user_email(),
-            'role': SessionManager.get_user_role(),
-            'is_admin': SessionManager.is_admin(),
-            'session_keys': list(st.session_state.keys())
-        }
+        return st.session_state.get('access_token')
+    
+    @staticmethod
+    def get_refresh_token() -> Optional[str]:
+        """
+        Get refresh token from session
+        
+        Returns:
+            Refresh token or None if not available
+        """
+        return st.session_state.get('refresh_token')

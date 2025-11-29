@@ -1,11 +1,27 @@
 from src.config.settings import settings
 from supabase import create_client, Client
+from src.utils.session_manager import SessionManager
 from src.utils.logger import logger
 import pandas as pd
 
 class FeaturesService:
     def __init__(self):
-        self.supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+        # Create authenticated client using session tokens
+        access_token = SessionManager.get_access_token()
+        refresh_token = SessionManager.get_refresh_token()
+
+        if access_token:
+            self.supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+            try:
+                self.supabase.auth.set_session(access_token, refresh_token)
+                logger.info("FeaturesService authenticated successfully")
+            except Exception as e:
+                logger.error(f"Failed to authenticate FeaturesService: {e}")
+                # Fallback to anonymous client
+                self.supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+        else:
+            logger.warning("No access token available, using anonymous client")
+            self.supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
 
     # --- PORTFOLIO ---
     def get_portfolio(self, user_id: str):

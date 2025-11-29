@@ -25,7 +25,7 @@ class VectorService:
 
     def __init__(self):
         """Initialize vector service with embeddings and database client"""
-        self.db = DatabaseClient.get_client()
+        self.db = DatabaseClient.get_authenticated_client()
 
         # Initialize embeddings with error handling for device issues
         try:

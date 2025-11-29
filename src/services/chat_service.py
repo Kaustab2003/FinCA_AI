@@ -14,7 +14,7 @@ class ChatService:
     """Service for AI chat operations"""
     
     def __init__(self):
-        self.db = DatabaseClient.get_client()
+        self.db = DatabaseClient.get_authenticated_client()
         self.supervisor = SupervisorAgent()
         self.vector_service = VectorService()
         self.data_entry_agent = ConversationalDataEntryAgent()

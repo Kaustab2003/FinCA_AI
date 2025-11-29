@@ -3,7 +3,9 @@ Goals Service - Handle financial goals operations
 """
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from src.config.database import DatabaseClient
+from supabase import create_client, Client
+from src.config.settings import settings
+from src.utils.session_manager import SessionManager
 from src.services.vector_service import VectorService
 from src.utils.logger import logger
 
@@ -12,7 +14,23 @@ class GoalsService:
     """Service for financial goals operations"""
     
     def __init__(self):
-        self.db = DatabaseClient.get_client()
+        # Create authenticated client using session tokens
+        access_token = SessionManager.get_access_token()
+        refresh_token = SessionManager.get_refresh_token()
+
+        if access_token:
+            self.db: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+            try:
+                self.db.auth.set_session(access_token, refresh_token)
+                logger.info("GoalsService authenticated successfully")
+            except Exception as e:
+                logger.error(f"Failed to authenticate GoalsService: {e}")
+                # Fallback to anonymous client
+                self.db = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+        else:
+            logger.warning("No access token available for GoalsService, using anonymous client")
+            self.db: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+        
         self.vector_service = VectorService()
     
     async def create_goal(self, user_id: str, goal_data: Dict[str, Any]) -> Dict[str, Any]:

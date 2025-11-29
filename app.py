@@ -1,6 +1,12 @@
 """
 FinCA AI - Integrated Streamlit Application with Real Backend
 """
+import os
+import sys
+import subprocess
+
+# Removed the relaunch mechanism as it was causing issues with multiple launches
+
 import streamlit as st
 import sys
 import asyncio
@@ -25,6 +31,9 @@ from src.ui.pages.features.portfolio_tracker import show_portfolio_tracker
 from src.ui.pages.features.gamification import show_gamification_hub
 from src.ui.pages.features.news import show_news_page
 from src.services.features_service import FeaturesService
+
+# Global services variable (initialized after authentication)
+services = None
 
 # Initialize logger
 # Force reload trigger
@@ -88,21 +97,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# Initialize services
-def get_services():
-    """Initialize service instances per user session"""
-    if 'services' not in st.session_state:
-        st.session_state.services = {
-            'chat': ChatService(),
-            'budget': BudgetService(),
-            'goals': GoalsService(),
-            'user': UserService(),
-            'metrics': MetricsCalculator()
-        }
-    return st.session_state.services
-
-services = get_services()
 
 # =====================================================
 # Initialize session state
@@ -799,7 +793,7 @@ def show_expense_analytics():
                     
                     # Also save to database transactions table
                     from src.config.database import DatabaseClient
-                    db = DatabaseClient.get_client()
+                    db = DatabaseClient.get_authenticated_client()
                     user_id = st.session_state.user_id
                     
                     transaction_data = {
@@ -1100,7 +1094,7 @@ def show_expense_analytics():
                         # Update in database if it exists there
                         try:
                             from src.config.database import DatabaseClient
-                            db = DatabaseClient.get_client()
+                            db = DatabaseClient.get_authenticated_client()
                             user_id = st.session_state.user_id
                             
                             # Find and update the transaction
@@ -1368,7 +1362,14 @@ def show_goals():
     st.markdown("---")
     with st.expander("➕ Create New Financial Goal", expanded=len(goals) == 0):
         # Show budget integration info
-        budget_data = SessionManager.get_budget_data()
+        try:
+            from src.config.database import DatabaseClient
+            db = DatabaseClient.get_authenticated_client()
+            budget_result = db.table('budgets').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(1).execute()
+            budget_data = budget_result.data[0] if budget_result.data else None
+        except Exception as e:
+            budget_data = None
+        
         if budget_data:
             st.info(f"💡 **Budget Integration Active!** Your monthly income: ₹{budget_data.get('income', 0):,.0f} | Savings: ₹{budget_data.get('savings', 0):,.0f}")
             
@@ -1381,7 +1382,7 @@ def show_goals():
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    emergency_suggestion = monthly_expenses * 6 if 'monthly_expenses' in locals() else monthly_income * 0.1 * 6
+                    emergency_suggestion = monthly_income * 6  # 6 months emergency fund
                     if st.button(f"🚨 Emergency Fund (₹{emergency_suggestion:,.0f})"):
                         st.session_state.suggested_goal = {
                             'name': 'Emergency Fund',
@@ -1468,39 +1469,56 @@ def show_goals():
     st.markdown("### 🎯 AI Goal Recommendations")
     st.markdown("*Smart suggestions based on your financial profile*")
     
-    if goals or budget_data:
-        try:
-            from src.agents.recommendation_agent import RecommendationAgent
-            recommendation_agent = RecommendationAgent()
-            
-            # Prepare recommendation context
-            recommendation_context = {
-                'user_id': user_id,
-                'existing_goals': goals,
-                'budget_data': budget_data,
-                'monthly_income': budget_data.get('income', 0) if budget_data else 0,
-                'monthly_expenses': budget_data.get('expenses', 0) if budget_data else 0,
-                'monthly_savings': budget_data.get('savings', 0) if budget_data else 0,
-                'user_context': st.session_state.user_context
-            }
-            
-            # Recommendation type buttons
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button("💰 Emergency Fund", key="emergency_recommendation"):
-                    st.session_state.recommendation_type = "emergency_fund"
-            
-            with col2:
-                if st.button("📈 Investment Goals", key="investment_recommendation"):
-                    st.session_state.recommendation_type = "investment_goals"
-            
-            with col3:
-                if st.button("🏠 Major Purchases", key="major_purchase_recommendation"):
-                    st.session_state.recommendation_type = "major_purchases"
-            
-            # Generate recommendations
-            recommendation_type = st.session_state.get('recommendation_type', 'emergency_fund')
+    # Load budget data from database
+    try:
+        from src.config.database import DatabaseClient
+        db = DatabaseClient.get_authenticated_client()
+        budget_result = db.table('budgets').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(1).execute()
+        budget_data = budget_result.data[0] if budget_result.data else None
+    except Exception as e:
+        st.warning(f"Could not load budget data: {str(e)}")
+        budget_data = None
+    
+    # Show AI recommendations - always available for testing
+    st.success("✅ **AI Recommendations Available!** Click any button below to get personalized suggestions.")
+    
+    try:
+        from src.agents.recommendation_agent import RecommendationAgent
+        recommendation_agent = RecommendationAgent()
+        
+        # Prepare recommendation context
+        recommendation_context = {
+            'user_id': user_id,
+            'existing_goals': goals or [],
+            'budget_data': budget_data,
+            'monthly_income': budget_data.get('income', 50000) if budget_data else 50000,  # Default for testing
+            'monthly_expenses': budget_data.get('expenses', 30000) if budget_data else 30000,
+            'monthly_savings': budget_data.get('savings', 10000) if budget_data else 10000,
+            'user_context': st.session_state.get('user_context', {}),
+            'age': st.session_state.get('user_context', {}).get('age', 28),
+            'risk_profile': st.session_state.get('user_context', {}).get('risk_profile', 'moderate')
+        }
+        
+        # Recommendation type buttons
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("💰 Emergency Fund", key="emergency_recommendation"):
+                st.session_state.recommendation_type = "emergency_fund"
+        
+        with col2:
+            if st.button("📈 Investment Goals", key="investment_recommendation"):
+                st.session_state.recommendation_type = "investment_goals"
+        
+        with col3:
+            if st.button("🏠 Major Purchases", key="major_purchase_recommendation"):
+                st.session_state.recommendation_type = "major_purchases"
+        
+        # Generate recommendations
+        recommendation_type = st.session_state.get('recommendation_type', None)
+        
+        if recommendation_type:
+            st.info(f"🎯 Generating {recommendation_type.replace('_', ' ').title()} recommendations...")
             
             with st.spinner("🎯 Analyzing your profile for goal recommendations..."):
                 loop = asyncio.new_event_loop()
@@ -1512,40 +1530,45 @@ def show_goals():
                     query = "Suggest investment goals suitable for my risk profile and timeline"
                 elif recommendation_type == "major_purchase":
                     query = "Recommend goals for major purchases like home, car, or education"
-                
-                response = loop.run_until_complete(
-                    recommendation_agent.process(query, recommendation_context)
-                )
-                loop.close()
-                
-                # Check if response is successful (no error in metadata and has content)
-                is_success = response.confidence > 0 and 'error' not in response.metadata and response.content
-                
-                if is_success:
-                    st.success(f"**{recommendation_type.replace('_', ' ').title()} Recommendations:**")
-                    st.markdown(response.content)
-                    
-                    # Add quick create button for recommended goals
-                    if st.button("✨ Create Recommended Goal", key="create_recommended_goal"):
-                        # Parse the recommendation to extract goal details
-                        # This is a simplified implementation - in production you'd parse the AI response
-                        st.info("💡 Feature coming soon: One-click goal creation from AI recommendations!")
-                    
-                    # Show recommendation metadata
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Recommendation Confidence", f"{response.confidence:.1f}%")
-                    with col2:
-                        st.metric("Goal Category", recommendation_type.replace('_', ' ').title())
                 else:
-                    st.error("❌ Unable to generate goal recommendations. Please try again later.")
+                    query = "Suggest general financial goals"
+                
+                try:
+                    response = loop.run_until_complete(
+                        recommendation_agent.process(query, recommendation_context)
+                    )
+                    loop.close()
                     
-        except Exception as e:
-            st.warning(f"🎯 AI Goal Recommendations temporarily unavailable: {str(e)}")
-            st.info("💡 **Manual Recommendations:** Consider emergency funds (3-6 months expenses) and investment goals!")
-    else:
-        st.info("🎯 **AI Goal Recommendations will appear here once you add goals or budget data!**")
-        st.markdown("Create a budget or set an initial goal to unlock personalized AI recommendations.")
+                    # Check if response is successful (no error in metadata and has content)
+                    is_success = response and response.confidence > 0 and 'error' not in response.metadata and response.content
+                    
+                    if is_success:
+                        st.success(f"**{recommendation_type.replace('_', ' ').title()} Recommendations:**")
+                        st.markdown(response.content)
+                        
+                        # Add quick create button for recommended goals
+                        if st.button("✨ Create Recommended Goal", key="create_recommended_goal"):
+                            # Parse the recommendation to extract goal details
+                            # This is a simplified implementation - in production you'd parse the AI response
+                            st.info("💡 Feature coming soon: One-click goal creation from AI recommendations!")
+                        
+                        # Show recommendation metadata
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("Recommendation Confidence", f"{response.confidence:.1f}%")
+                        with col2:
+                            st.metric("Goal Category", recommendation_type.replace('_', ' ').title())
+                    else:
+                        st.error("❌ Unable to generate goal recommendations. Please try again later.")
+                            
+                except Exception as e:
+                    st.error(f"❌ Error generating recommendations: {str(e)}")
+        else:
+            st.info("👆 **Click any button above to get AI-powered goal recommendations!**")
+                    
+    except Exception as e:
+        st.warning(f"🎯 AI Goal Recommendations temporarily unavailable: {str(e)}")
+        st.info("💡 **Manual Recommendations:** Consider emergency funds (3-6 months expenses) and investment goals!")
 
 # =====================================================
 # REAL-LIFE FEATURES WITH DATABASE INTEGRATION
@@ -1561,7 +1584,7 @@ def show_salary_breakup():
     
     # Get database client
     from src.config.database import DatabaseClient
-    db = DatabaseClient.get_client()
+    db = DatabaseClient.get_authenticated_client()
     user_id = st.session_state.user_id
     
     # Try to load existing data
@@ -1871,7 +1894,7 @@ def show_bill_reminder():
     
     # Get database client
     from src.config.database import DatabaseClient
-    db = DatabaseClient.get_client()
+    db = DatabaseClient.get_authenticated_client()
     user_id = st.session_state.user_id
     
     # Load existing bills
@@ -2179,7 +2202,7 @@ def show_credit_card_optimizer():
     
     # Get database client
     from src.config.database import DatabaseClient
-    db = DatabaseClient.get_client()
+    db = DatabaseClient.get_authenticated_client()
     user_id = st.session_state.user_id
     
     # Load existing cards
@@ -2439,7 +2462,7 @@ def show_fd_vs_debt_fund():
     
     # Get database client
     from src.config.database import DatabaseClient
-    db = DatabaseClient.get_client()
+    db = DatabaseClient.get_authenticated_client()
     user_id = st.session_state.user_id
     
     # Get budget data for suggestions
@@ -2700,7 +2723,7 @@ def show_quick_money_moves():
     
     # Get database client
     from src.config.database import DatabaseClient
-    db = DatabaseClient.get_client()
+    db = DatabaseClient.get_authenticated_client()
     user_id = st.session_state.user_id
     
     # Load moves
@@ -3032,6 +3055,22 @@ def main():
             show_login()
         return
     
+    # Initialize services AFTER authentication
+    def get_services():
+        """Initialize service instances per user session"""
+        if 'services' not in st.session_state:
+            st.session_state.services = {
+                'chat': ChatService(),
+                'budget': BudgetService(),
+                'goals': GoalsService(),
+                'user': UserService(),
+                'metrics': MetricsCalculator()
+            }
+        return st.session_state.services
+
+    global services
+    services = get_services()
+    
     # Header
     st.markdown('<h1 class="main-header">💰 FinCA AI</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #666;">Your Personal Finance Copilot for India</p>', unsafe_allow_html=True)
@@ -3198,7 +3237,7 @@ def show_dashboard():
     
     # Get real data from database
     from src.config.database import DatabaseClient
-    db = DatabaseClient.get_client()
+    db = DatabaseClient.get_authenticated_client()
     user_id = st.session_state.user_id
     
     # Validate user_id

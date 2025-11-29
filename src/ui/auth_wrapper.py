@@ -47,7 +47,7 @@ def main():
         show_auth_page()
     else:
         # User is authenticated, load main app
-        import src.ui.app_integrated as app
+        import app as app
         app.main()
 
 
